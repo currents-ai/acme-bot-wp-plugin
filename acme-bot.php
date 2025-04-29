@@ -93,6 +93,8 @@ if (!class_exists('AcmeBot')) {
                 // Redirect to settings page after activation
                 add_action('admin_init', [$this, 'admin_init']);
 
+                add_action('admin_notices', [$this, 'display_settings_errors']);
+
                 //Register activation hook to set up the plugin
                 register_activation_hook(__FILE__, ['AcmeBot', 'activate']);
 
@@ -166,144 +168,186 @@ if (!class_exists('AcmeBot')) {
          */
         public function handle_webhook(WP_REST_Request $request): WP_REST_Response
         {
-            // 1. Verify the Secret
-            $received_secret = $request->get_header('x-secret');
-            $stored_secret = get_option(self::SECRET_OPTION);
+            try {
+                // 1. Verify the Secret
+                $received_secret = $request->get_header('x-secret');
+                $stored_secret = get_option(self::SECRET_OPTION);
 
-            // Ensure both secrets are set and compare them securely
-            if (empty($received_secret) || empty($stored_secret) || !hash_equals((string) $stored_secret, (string) $received_secret)) {
-                return new WP_REST_Response(__('Unauthorized', 'acme-bot'), 401);
+                // Ensure both secrets are set and compare them securely
+                if (empty($received_secret) || empty($stored_secret) || !hash_equals((string) $stored_secret, (string) $received_secret)) {
+                    return new WP_REST_Response(__('Unauthorized', 'acme-bot'), 401);
+                }
+
+                // 2. Process the Event
+                $event = $request->get_param('event');
+                $payload = $request->get_param('payload');
+
+                // Validate required parameters
+                if (empty($event)) {
+                    return new WP_REST_Response(__('Missing required parameter: event', 'acme-bot'), 400);
+                }
+
+                switch ($event) {
+                    case self::EVENT_INTEGRATION_CREATED:
+                        // Simple success response for integration confirmation
+                        return new WP_REST_Response(__('Integration successful', 'acme-bot'), 200);
+
+                    case self::EVENT_CREATE_POST:
+                        // Handle post creation with its own try-catch for specific errors
+                        return $this->handle_create_post($payload);
+
+                    default:
+                        // Event type not recognized
+                        return new WP_REST_Response(__('Event not recognized', 'acme-bot'), 400);
+                }
+            } catch (Exception $e) {
+                // Log the full exception for debugging
+                error_log('AcmeBot Webhook Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
+
+                // Return a controlled error response
+                return new WP_REST_Response(
+                    sprintf(__('Error processing webhook: %s', 'acme-bot'), $e->getMessage()),
+                    500
+                );
             }
+        }
 
-            // 2. Process the Event
-            $event = $request->get_param('event');
-            $payload = $request->get_param('payload');
+        /**
+         * Handle the create_post event from the webhook.
+         * 
+         * @param array $payload The payload for the create_post event.
+         * @return WP_REST_Response Response object.
+         */
+        private function handle_create_post($payload): WP_REST_Response
+        {
+            try {
+                // Validate payload structure
+                if (!is_array($payload)) {
+                    error_log('AcmeBot Webhook: Received non-array payload for create_post. Type: ' . gettype($payload));
+                    return new WP_REST_Response(__('Invalid payload: Payload must be an object/associative array.', 'acme-bot'), 400);
+                }
 
-            switch ($event) {
-                case self::EVENT_INTEGRATION_CREATED:
-                    // Simple success response for integration confirmation
-                    return new WP_REST_Response(__('Integration successful', 'acme-bot'), 200);
+                // Get title and content using null coalescing operator for safety
+                $title = $payload['title'] ?? null;
+                $content = $payload['content'] ?? null;
 
-                case self::EVENT_CREATE_POST:
-                    // Validate payload structure
-                    if (!is_array($payload)) {
-                        error_log('Acme Bot Webhook: Received non-array payload for create_post. Type: ' . gettype($payload));
-                        return new WP_REST_Response(__('Invalid payload: Payload must be an object/associative array.', 'acme-bot'), 400);
+                // Ensure required fields are present
+                if (empty($title) || !isset($content)) { // Allow empty content string, but title must be non-empty
+                    return new WP_REST_Response(__('Invalid payload: title is required, content must be present', 'acme-bot'), 400);
+                }
+
+                // --- Post Author Handling ---
+                $author_id = self::DEFAULT_AUTHOR_ID; // Start with default
+
+                // First check if user_id is provided
+                if (isset($payload['user_id']) && is_numeric($payload['user_id'])) {
+                    $potential_author_id = absint($payload['user_id']); // Ensure positive integer
+                    if ($potential_author_id > 0 && get_user_by('ID', $potential_author_id)) {
+                        $author_id = $potential_author_id;
+                    } else {
+                        error_log('AcmeBot Webhook: Invalid or non-existent user_id provided: ' . $payload['user_id']);
                     }
+                }
+                // Then check if user_name is provided
+                elseif (isset($payload['user_name']) && is_string($payload['user_name']) && !empty(trim($payload['user_name']))) {
+                    $username = sanitize_user($payload['user_name']);
+                    $user = get_user_by('login', $username);
 
-                    // Get title and content using null coalescing operator for safety
-                    $title = $payload['title'] ?? null;
-                    $content = $payload['content'] ?? null;
+                    if (!$user) {
+                        // Also try to find by display name
+                        $users = get_users([
+                            'search' => $username,
+                            'search_columns' => ['display_name'],
+                            'number' => 1
+                        ]);
 
-                    // Ensure required fields are present
-                    if (empty($title) || !isset($content)) { // Allow empty content string, but title must be non-empty
-                        return new WP_REST_Response(__('Invalid payload: title is required, content must be present', 'acme-bot'), 400);
-                    }
-
-                    // --- Post Author Handling ---
-                    $author_id = self::DEFAULT_AUTHOR_ID; // Start with default
-
-                    // First check if user_id is provided
-                    if (isset($payload['user_id']) && is_numeric($payload['user_id'])) {
-                        $potential_author_id = absint($payload['user_id']); // Ensure positive integer
-                        if ($potential_author_id > 0 && get_user_by('ID', $potential_author_id)) {
-                            $author_id = $potential_author_id;
-                        } else {
-                            error_log('Acme Bot Webhook: Invalid or non-existent user_id provided: ' . $payload['user_id']);
+                        if (!empty($users)) {
+                            $user = $users[0];
                         }
                     }
-                    // Then check if user_name is provided
-                    elseif (isset($payload['user_name']) && is_string($payload['user_name']) && !empty(trim($payload['user_name']))) {
-                        $username = sanitize_user($payload['user_name']);
-                        $user = get_user_by('login', $username);
 
-                        if (!$user) {
-                            // Also try to find by display name
-                            $users = get_users([
-                                'search' => $username,
-                                'search_columns' => ['display_name'],
-                                'number' => 1
-                            ]);
+                    if ($user && $user->ID > 0) {
+                        $author_id = $user->ID;
+                    } else {
+                        error_log('AcmeBot Webhook: User not found by username: ' . $username);
+                    }
+                }
 
-                            if (!empty($users)) {
-                                $user = $users[0];
+                // --- Category Handling ---
+                $category_ids = [];
+                if (isset($payload['categories']) && is_array($payload['categories'])) {
+                    foreach ($payload['categories'] as $category_ref) {
+                        $cat_id = 0;
+
+                        if (is_int($category_ref) || is_numeric($category_ref)) {
+                            // Assume it's an ID
+                            $term = term_exists(absint($category_ref), 'category');
+                            if ($term) {
+                                $cat_id = (int)$term['term_id'];
                             }
-                        }
-
-                        if ($user && $user->ID > 0) {
-                            $author_id = $user->ID;
-                        } else {
-                            error_log('Acme Bot Webhook: User not found by username: ' . $username);
-                        }
-                    }
-
-                    // --- Category Handling ---
-                    $category_ids = [];
-                    if (isset($payload['categories']) && is_array($payload['categories'])) {
-                        foreach ($payload['categories'] as $category_ref) {
-                            $cat_id = 0;
-                            if (is_int($category_ref) || is_numeric($category_ref)) {
-                                // Assume it's an ID
-                                $term = term_exists(absint($category_ref), 'category');
-                                if ($term) {
-                                    $cat_id = (int)$term['term_id'];
+                        } elseif (is_string($category_ref) && !empty(trim($category_ref))) {
+                            // Assume it's a name
+                            $category_name = sanitize_text_field($category_ref);
+                            $term = term_exists($category_name, 'category');
+                            if ($term) {
+                                $cat_id = (int)$term['term_id'];
+                            } else {
+                                $new_cat = wp_insert_term($category_name, 'category');
+                                if (!is_wp_error($new_cat) && isset($new_cat['term_id'])) {
+                                    $cat_id = (int)$new_cat['term_id'];
                                 }
-                            } elseif (is_string($category_ref) && !empty(trim($category_ref))) {
-                                // Assume it's a name
-                                $category_name = sanitize_text_field($category_ref);
-                                $term = term_exists($category_name, 'category');
-                                if ($term) {
-                                    $cat_id = (int)$term['term_id'];
-                                } else {
-                                    $new_cat = wp_create_category($category_name);
-                                    if (!is_wp_error($new_cat)) {
-                                        $cat_id = $new_cat;
-                                    }
-                                }
-                            }
-
-                            if ($cat_id > 0 && !in_array($cat_id, $category_ids)) {
-                                $category_ids[] = $cat_id;
                             }
                         }
+
+                        if ($cat_id > 0 && !in_array($cat_id, $category_ids)) {
+                            $category_ids[] = $cat_id;
+                        }
                     }
+                }
 
-                    // --- Sanitize and Prepare Post Data ---
-                    $post_data = [
-                        'post_title'   => sanitize_text_field($title),
-                        'post_content' => wp_kses_post($content), // Allows safe HTML
-                        'post_status'  => 'publish',             // Or 'draft' etc.
-                        'post_author'  => $author_id,
-                    ];
+                // --- Sanitize and Prepare Post Data ---
+                $post_data = [
+                    'post_title'   => sanitize_text_field($title),
+                    'post_content' => wp_kses_post($content), // Allows safe HTML
+                    'post_status'  => 'publish',             // Or 'draft' etc.
+                    'post_author'  => $author_id,
+                ];
 
-                    // Add categories if any were validated
-                    if (!empty($category_ids)) {
-                        $post_data['post_category'] = $category_ids;
-                    }
+                // Add categories if any were validated
+                if (!empty($category_ids)) {
+                    $post_data['post_category'] = $category_ids;
+                }
 
-                    // --- Insert Post ---
-                    $post_id = wp_insert_post($post_data, true); // Pass true to return WP_Error on failure
+                // --- Insert Post ---
+                $post_id = wp_insert_post($post_data, true); // Pass true to return WP_Error on failure
 
-                    // Check for errors during post creation
-                    if (is_wp_error($post_id)) {
-                        error_log('Acme Bot Error: Failed to create post via webhook. WP_Error: ' . $post_id->get_error_message());
-                        return new WP_REST_Response(
-                            sprintf(__('Failed to create post: %s', 'acme-bot'), $post_id->get_error_message()),
-                            500
-                        );
-                    }
+                // Check for errors during post creation
+                if (is_wp_error($post_id)) {
+                    error_log('AcmeBot Error: Failed to create post via webhook. WP_Error: ' . $post_id->get_error_message());
+                    return new WP_REST_Response(
+                        sprintf(__('Failed to create post: %s', 'acme-bot'), $post_id->get_error_message()),
+                        500
+                    );
+                }
 
-                    // Post created successfully
-                    $post_url = get_permalink($post_id);
-                    return new WP_REST_Response([
-                        'message' => __('Post created successfully', 'acme-bot'),
-                        'post_id' => $post_id,
-                        'url' => $post_url
-                    ], 200);
+                // Post created successfully
+                $post_url = get_permalink($post_id);
 
-                default:
-                    // Event type not recognized
-                    return new WP_REST_Response(__('Event not recognized', 'acme-bot'), 400);
+                return new WP_REST_Response([
+                    'message' => __('Post created successfully', 'acme-bot'),
+                    'post_id' => $post_id,
+                    'url' => $post_url,
+                    'status' => 'SUCCESS',
+                ], 200);
+            } catch (Exception $e) {
+                // Log the error for administrators
+                error_log('AcmeBot Error in create_post handler: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
+
+                // Return a server error response
+                return new WP_REST_Response(
+                    sprintf(__('Error creating post: %s', 'acme-bot'), $e->getMessage()),
+                    500
+                );
             }
         }
         /**
@@ -360,7 +404,7 @@ if (!class_exists('AcmeBot')) {
                 update_option('acmebot_default_author_id', $integrating_user_id);
 
                 // Generate and Store Strong Secret
-                $secret = wp_generate_password(64, true);
+                $secret = wp_generate_password(64, false);
                 if (!update_option(self::SECRET_OPTION, $secret)) {
                     throw new Exception(__('Failed to save integration secret.', 'acme-bot'));
                 }

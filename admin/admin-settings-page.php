@@ -20,9 +20,33 @@ $is_connected = !empty($acmebot_secret);
 $webhook_url = $is_connected ? rest_url('acmebot/v' . AcmeBot::REST_VERSION . '/webhook') : '';
 $documentation_url = 'https://acme.bot/blog/application-passwords';
 $logo_url = 'https://acme.bot/logo/logo-small-wide.svg';
+
+// Get any error messages that need to be displayed
+$error_messages = get_transient('acmebot_settings_errors');
+$success_message = isset($_GET['acmebot_setup_success']) && $_GET['acmebot_setup_success'] === '1';
 ?>
 <div class="settings-wrap">
     <h1 class="title"><?php echo esc_html(get_admin_page_title()); ?></h1>
+
+    <?php
+    // Display error messages if any
+    if (!empty($error_messages) && is_array($error_messages)) : ?>
+        <div class="acmebot-notice error-notice">
+            <?php foreach ($error_messages as $error) : ?>
+                <p><?php echo esc_html($error); ?></p>
+            <?php endforeach; ?>
+        </div>
+    <?php
+        // Clear the error messages after displaying them
+        delete_transient('acmebot_settings_errors');
+    endif;
+
+    // Display success message if applicable
+    if ($success_message) : ?>
+        <div class="acmebot-notice success-notice is-dismissible">
+            <p><?php esc_html_e('Acme Bot integration setup was successful!', 'acme-bot'); ?></p>
+        </div>
+    <?php endif; ?>
 
     <div class="content-box">
         <div class="card">
@@ -34,6 +58,16 @@ $logo_url = 'https://acme.bot/logo/logo-small-wide.svg';
 
                     <h2 class="card-title"><?php esc_html_e('Connection Active', 'acme-bot'); ?></h2>
                     <p><?php esc_html_e('Acme Bot is successfully connected to this site.', 'acme-bot'); ?></p>
+
+                    <!-- <?php if ($webhook_url) : ?>
+                        <div class="acmebot-webhook-box">
+                            <span class="acmebot-webhook-label"><?php esc_html_e('Your Webhook URL:', 'acme-bot'); ?></span>
+                            <div class="acmebot-connected-content">
+                                <code><?php echo esc_html($webhook_url); ?></code>
+                            </div>
+                        </div>
+                    <?php endif; ?> -->
+
                     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="acmebot-connect-form">
                         <input type="hidden" name="action" value="acmebot_handle_form">
                         <?php wp_nonce_field('acmebot_settings_action', 'acmebot_settings_nonce'); ?>
@@ -304,6 +338,33 @@ $logo_url = 'https://acme.bot/logo/logo-small-wide.svg';
         font-style: italic;
     }
 
+    .acmebot-notice {
+        max-width: 520px;
+        margin: 0 auto 30px;
+        padding: 15px 20px;
+        border-radius: 12px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.07);
+        border-left: 4px solid;
+        animation: fadeIn 0.4s ease-out forwards;
+    }
+
+    .acmebot-notice p {
+        margin: 8px 0;
+        font-size: 14px;
+    }
+
+    .acmebot-notice.error-notice {
+        background-color: #fff5f5;
+        border-left-color: #e53e3e;
+        color: #c53030;
+    }
+
+    .acmebot-notice.success-notice {
+        background-color: #f0fff4;
+        border-left-color: #38a169;
+        color: #2f855a;
+    }
+
     /* Responsive */
     @media (max-width: 600px) {
         .title {
@@ -326,6 +387,11 @@ $logo_url = 'https://acme.bot/logo/logo-small-wide.svg';
 
         .acmebot-secondary-link {
             padding: 18px 20px;
+        }
+
+        .acmebot-notice {
+            max-width: 100%;
+            margin-bottom: 20px;
         }
     }
 
