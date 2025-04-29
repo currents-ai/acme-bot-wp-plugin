@@ -7,7 +7,7 @@
  *
  * @wordpress-plugin
  * Plugin Name:     Acme Bot
- * Description:     Acme Bot - AI content assistant for WordPress.
+ * Description:     Acme Bot - AI content agent for WordPress.
  * Version:         1.0.0 
  * Author:          Acme Bot Team
  * Author URI:      https://acme.bot/
