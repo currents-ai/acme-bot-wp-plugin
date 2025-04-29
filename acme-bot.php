@@ -223,21 +223,39 @@ if (!class_exists('AcmeBot')) {
             try {
                 // Validate payload structure
                 if (!is_array($payload)) {
-                    error_log('AcmeBot Webhook: Received non-array payload for create_post. Type: ' . gettype($payload));
+                    error_log('AcmeBot Webhook: Received non-array payload for post handler. Type: ' . gettype($payload));
                     return new WP_REST_Response(__('Invalid payload: Payload must be an object/associative array.', 'acme-bot'), 400);
+                }
+
+                // Check if we're updating an existing post
+                $is_update = isset($payload['post_id']) && is_numeric($payload['post_id']);
+                $post_id = $is_update ? absint($payload['post_id']) : 0;
+
+                // Verify post exists if we're updating
+                if ($is_update) {
+                    $existing_post = get_post($post_id);
+                    if (!$existing_post) {
+                        return new WP_REST_Response(__('Invalid post_id: Post does not exist.', 'acme-bot'), 400);
+                    }
                 }
 
                 // Get title and content using null coalescing operator for safety
                 $title = $payload['title'] ?? null;
                 $content = $payload['content'] ?? null;
 
-                // Ensure required fields are present
-                if (empty($title) || !isset($content)) { // Allow empty content string, but title must be non-empty
+                // For updates, we'll only require fields that are provided
+                if (!$is_update && (empty($title) || !isset($content))) {
+                    // For new posts, title is required and content must be present
                     return new WP_REST_Response(__('Invalid payload: title is required, content must be present', 'acme-bot'), 400);
                 }
 
                 // --- Post Author Handling ---
                 $author_id = self::DEFAULT_AUTHOR_ID; // Start with default
+
+                // If updating, use existing author as default
+                if ($is_update) {
+                    $author_id = $existing_post->post_author;
+                }
 
                 // First check if user_id is provided
                 if (isset($payload['user_id']) && is_numeric($payload['user_id'])) {
@@ -307,45 +325,60 @@ if (!class_exists('AcmeBot')) {
 
                 // --- Sanitize and Prepare Post Data ---
                 $post_data = [
-                    'post_title'   => sanitize_text_field($title),
-                    'post_content' => wp_kses_post($content), // Allows safe HTML
-                    'post_status'  => 'publish',             // Or 'draft' etc.
-                    'post_author'  => $author_id,
+                    'post_status' => 'publish', // Or 'draft' etc.
+                    'post_author' => $author_id,
                 ];
+
+                // Only include title if provided (for updates)
+                if (isset($title)) {
+                    $post_data['post_title'] = sanitize_text_field($title);
+                }
+
+                // Only include content if provided (for updates)
+                if (isset($content)) {
+                    $post_data['post_content'] = wp_kses_post($content); // Allows safe HTML
+                }
 
                 // Add categories if any were validated
                 if (!empty($category_ids)) {
                     $post_data['post_category'] = $category_ids;
                 }
 
-                // --- Insert Post ---
-                $post_id = wp_insert_post($post_data, true); // Pass true to return WP_Error on failure
+                // For updates, set the ID
+                if ($is_update) {
+                    $post_data['ID'] = $post_id;
+                }
 
-                // Check for errors during post creation
-                if (is_wp_error($post_id)) {
-                    error_log('AcmeBot Error: Failed to create post via webhook. WP_Error: ' . $post_id->get_error_message());
+                // --- Insert or Update Post ---
+                $result_post_id = wp_insert_post($post_data, true); // Pass true to return WP_Error on failure
+
+                // Check for errors during post creation/update
+                if (is_wp_error($result_post_id)) {
+                    $action = $is_update ? 'update' : 'create';
+                    error_log("AcmeBot Error: Failed to {$action} post via webhook. WP_Error: " . $result_post_id->get_error_message());
                     return new WP_REST_Response(
-                        sprintf(__('Failed to create post: %s', 'acme-bot'), $post_id->get_error_message()),
+                        sprintf(__("Failed to {$action} post: %s", 'acme-bot'), $result_post_id->get_error_message()),
                         500
                     );
                 }
 
-                // Post created successfully
-                $post_url = get_permalink($post_id);
+                // Post created/updated successfully
+                $post_url = get_permalink($result_post_id);
+                $action = $is_update ? 'updated' : 'created';
 
                 return new WP_REST_Response([
-                    'message' => __('Post created successfully', 'acme-bot'),
-                    'post_id' => $post_id,
+                    'message' => sprintf(__('Post %s successfully', 'acme-bot'), $action),
+                    'post_id' => $result_post_id,
                     'url' => $post_url,
                     'status' => 'SUCCESS',
                 ], 200);
             } catch (Exception $e) {
                 // Log the error for administrators
-                error_log('AcmeBot Error in create_post handler: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
+                error_log('AcmeBot Error in post handler: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
 
                 // Return a server error response
                 return new WP_REST_Response(
-                    sprintf(__('Error creating post: %s', 'acme-bot'), $e->getMessage()),
+                    sprintf(__('Error handling post: %s', 'acme-bot'), $e->getMessage()),
                     500
                 );
             }
