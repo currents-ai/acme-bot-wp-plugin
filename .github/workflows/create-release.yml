@@ -1,4 +1,4 @@
-name: Create Release
+name: Create Plugin Release
 
 on:
   push:
@@ -14,18 +14,39 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Get version from package.json or generate tag
-        id: version
+      - name: Extract plugin version from acme-bot.php
+        id: get_version
         run: |
-          VERSION=$(date +%Y.%m.%d.%H%M%S)
+          VERSION=$(grep -i "Version:" acme-bot.php | head -n 1 | sed 's/.*Version:[[:space:]]*//')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check if tag exists
+        id: tag_check
+        run: |
+          TAG="v${{ steps.get_version.outputs.version }}"
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG$"; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set release tag
+        id: set_tag
+        run: |
+          if [[ "${{ steps.tag_check.outputs.exists }}" == "true" ]]; then
+            TAG="v${{ steps.get_version.outputs.version }}-dev.$(date +%Y%m%d%H%M)"
+          else
+            TAG="v${{ steps.get_version.outputs.version }}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: Release ${{ steps.version.outputs.version }}
+          tag_name: ${{ steps.set_tag.outputs.tag }}
+          name: Release ${{ steps.set_tag.outputs.tag }}
           body: |
-            Automated release created after merging into master.
+            Automatically created from master.
+            - Commit: ${{ github.sha }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
