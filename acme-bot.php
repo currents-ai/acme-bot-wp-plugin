@@ -54,7 +54,7 @@ if (!class_exists('AcmeBot')) {
          * @var bool
          */
 
-        const IS_INTEGRATION_COMPLETED = 'integration_completed';
+        const IS_INTEGRATION_COMPLETED = 'acmebot_integration_completed';
 
         /**
          * Event name for integration creation confirmation.
@@ -146,6 +146,7 @@ if (!class_exists('AcmeBot')) {
         {
             delete_option(self::SECRET_OPTION);
             delete_option(self::INTEGRATING_USER_ID_OPTION);
+            delete_option(self::IS_INTEGRATION_COMPLETED);
             delete_transient('acmebot_settings_errors'); // Clean up transients too
             delete_transient('acmebot_activation_redirect');
         }
@@ -652,7 +653,7 @@ if (!class_exists('AcmeBot')) {
                 $post_url = rest_url($namespace . '/posts');
                 $site_url = site_url();
                 $site_name = get_bloginfo('name');
-                $redirect_url = add_query_arg(
+                $acme_auth_url = add_query_arg(
                     urlencode_deep([
                         'webhook_url' => $webhook_url,
                         // 'verify_url' => $verify_url,
@@ -664,9 +665,10 @@ if (!class_exists('AcmeBot')) {
                         // 'return_url_success' => admin_url('options-general.php?page=acme-bot-integration&acmebot_setup_success=1'), // URL to redirect back on success
                         // 'return_url_fail' => admin_url('options-general.php?page=acme-bot-integration&acmebot_setup_fail=1'),   // URL to redirect back on failure
                     ]),
-                    self::ACMEBOT_API_AUTHORIZE_URL
+                    urlencode(self::ACMEBOT_API_AUTHORIZE_URL)
                 );
 
+                $redirect_url = add_query_arg('redirect_path',  $acme_auth_url, 'https://acme.bot/login');
                 // Redirect User
                 wp_safe_redirect($redirect_url);
                 exit;
