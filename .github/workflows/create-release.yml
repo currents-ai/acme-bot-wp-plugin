@@ -29,24 +29,35 @@ jobs:
           else
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
 
-      - name: Set release tag
+      - name: Set release tag and prerelease flag
         id: set_tag
         run: |
           if [[ "${{ steps.tag_check.outputs.exists }}" == "true" ]]; then
-            TAG="v${{ steps.get_version.outputs.version }}-dev.$(date +%Y%m%d%H%M)"
+            TAG="${{ steps.tag_check.outputs.tag }}-dev.$(date +%Y%m%d%H%M)"
+            PRERELEASE=true
           else
-            TAG="v${{ steps.get_version.outputs.version }}"
+            TAG="${{ steps.tag_check.outputs.tag }}"
+            PRERELEASE=false
           fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
+
+      - name: Zip plugin directory
+        run: |
+          zip -r acme-bot.zip acme-bot -x "acme-bot/.git*" "acme-bot/.github*" "acme-bot/.gitignore" "acme-bot/README.md"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.set_tag.outputs.tag }}
           name: Release ${{ steps.set_tag.outputs.tag }}
+          prerelease: ${{ steps.set_tag.outputs.prerelease }}
           body: |
-            Automatically created from master.
+            Automatically created from master branch.
+            - Plugin version: ${{ steps.get_version.outputs.version }}
             - Commit: ${{ github.sha }}
+          files: acme-bot.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
