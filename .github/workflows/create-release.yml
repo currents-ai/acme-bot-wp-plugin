@@ -1,0 +1,31 @@
+name: Create Release
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version from package.json or generate tag
+        id: version
+        run: |
+          VERSION=$(date +%Y.%m.%d.%H%M%S)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
+          body: |
+            Automated release created after merging into master.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
