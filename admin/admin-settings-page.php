@@ -16,6 +16,7 @@ if (!defined('ABSPATH')) {
 }
 
 $acmebot_secret = get_option(AcmeBot::SECRET_OPTION);
+$is_integration_completed = get_option(AcmeBot::IS_INTEGRATION_COMPLETED);
 $is_connected = !empty($acmebot_secret);
 $webhook_url = $is_connected ? rest_url('acmebot/v' . AcmeBot::REST_VERSION . '/webhook') : '';
 $documentation_url = 'https://acme.bot/blog/application-passwords';
@@ -56,17 +57,15 @@ $success_message = isset($_GET['acmebot_setup_success']) && $_GET['acmebot_setup
                         <img src="<?php echo esc_url($logo_url); ?>" alt="Acme Bot" class="acmebot-logo-img" />
                     </div>
 
-                    <h2 class="card-title"><?php esc_html_e('Connection Active', 'acme-bot'); ?></h2>
-                    <p><?php esc_html_e('Acme Bot is successfully connected to this site.', 'acme-bot'); ?></p>
+                    <?php if ($is_integration_completed) : ?>
+                        <h2 class="card-title"><?php esc_html_e('Connection Active', 'acme-bot'); ?></h2>
+                        <p><?php esc_html_e('Acme Bot is successfully connected to this site.', 'acme-bot'); ?></p>
+                    <?php endif; ?>
 
-                    <!-- <?php if ($webhook_url) : ?>
-                        <div class="acmebot-webhook-box">
-                            <span class="acmebot-webhook-label"><?php esc_html_e('Your Webhook URL:', 'acme-bot'); ?></span>
-                            <div class="acmebot-connected-content">
-                                <code><?php echo esc_html($webhook_url); ?></code>
-                            </div>
-                        </div>
-                    <?php endif; ?> -->
+                    <?php if (!$is_integration_completed) : ?>
+                        <h2 class="card-title"><?php esc_html_e('Connection is not Active', 'acme-bot') ?></h2>
+                        <p><?php esc_html_e('Acme Bot connection is incomplete! Please try to reconnect.', 'acme-bot'); ?></p>
+                    <?php endif; ?>
 
                     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="acmebot-connect-form">
                         <input type="hidden" name="action" value="acmebot_handle_form">
