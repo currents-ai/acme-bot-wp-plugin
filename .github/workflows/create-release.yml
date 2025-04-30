@@ -1,15 +1,12 @@
 name: Create Plugin Release
-
 on:
   push:
     branches:
       - master
-
 jobs:
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -17,8 +14,9 @@ jobs:
       - name: Extract plugin version from acme-bot.php
         id: get_version
         run: |
-          VERSION=$(grep -i "Version:" acme-bot.php | head -n 1 | sed 's/.*Version:[[:space:]]*//')
+          VERSION=$(grep -i "Version:" acme-bot.php | head -n 1 | sed 's/.*Version:[[:space:]]*//' | tr -d '\r')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
 
       - name: Check if tag exists
         id: tag_check
@@ -30,6 +28,7 @@ jobs:
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Tag check: $TAG - Exists: $(git ls-remote --tags origin | grep -q "refs/tags/$TAG$" && echo 'true' || echo 'false')"
 
       - name: Set release tag and prerelease flag
         id: set_tag
@@ -43,10 +42,23 @@ jobs:
           fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
+          echo "Final tag: $TAG, Prerelease: $PRERELEASE"
 
       - name: Zip plugin directory
         run: |
-          zip -r acme-bot.zip acme-bot -x "acme-bot/.git*" "acme-bot/.github*" "acme-bot/.gitignore" "acme-bot/README.md"
+          # Create a temporary directory for building the zip
+          mkdir -p build
+          
+          # Copy all plugin files to the build directory (excluding unwanted files)
+          rsync -av --exclude=".git" --exclude=".github" --exclude=".gitignore" --exclude="README.md" --exclude="build" . build/acme-bot/
+          
+          # Navigate to build directory and create the zip
+          cd build
+          zip -r ../acme-bot.zip acme-bot
+          
+          # Go back to root and verify the zip file exists
+          cd ..
+          ls -la acme-bot.zip
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
