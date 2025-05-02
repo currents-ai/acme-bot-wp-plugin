@@ -79,7 +79,7 @@ if (!class_exists('AcmeBot')) {
          * The URL for the Acme Bot API authorization.
          * @var string
          */
-        const ACMEBOT_API_AUTHORIZE_URL = 'https://acme.bot/d/{cust_id}/connectors/create';
+        const ACMEBOT_API_AUTHORIZE_URL = 'http://localhost:8001/d/{cust_id}/connectors/create';
 
         /**
          * The host for the Acme Bot API.
@@ -652,23 +652,26 @@ if (!class_exists('AcmeBot')) {
                 $verify_url = rest_url($namespace . '/verify');
                 $post_url = rest_url($namespace . '/posts');
                 $site_url = site_url();
-                $site_name = get_bloginfo('name');
+                $current_user = wp_get_current_user();
+                $username = $current_user->user_login;
+
                 $acme_auth_url = add_query_arg(
                     urlencode_deep([
                         'webhook_url' => $webhook_url,
-                        // 'verify_url' => $verify_url,
-                        // 'post_url' => $post_url,
+                        'verify_url' => $verify_url,
+                        'post_url' => $post_url,
                         'secret' => $secret,
-                        'user_id' => $integrating_user_id,
-                        'site_url' => $site_url,
-                        'site_name' => $site_name,
+                        'username' => $username,
+                        'site' => $site_url,
+                        'connector_flow_type' => 'CONNECTOR_WORDPRESS_PLUGIN',
+                        'flow_type' => 'CONNECTOR',
                         // 'return_url_success' => admin_url('options-general.php?page=acme-bot-integration&acmebot_setup_success=1'), // URL to redirect back on success
-                        // 'return_url_fail' => admin_url('options-general.php?page=acme-bot-integration&acmebot_setup_fail=1'),   // URL to redirect back on failure
+                        'return_url_fail' => admin_url('options-general.php?page=acme-bot-integration&acmebot_setup_fail=1'),
                     ]),
                     urlencode(self::ACMEBOT_API_AUTHORIZE_URL)
                 );
 
-                $redirect_url = add_query_arg('redirect_path',  $acme_auth_url, 'https://acme.bot/login');
+                $redirect_url = add_query_arg('redirect_path', urlencode($acme_auth_url), 'https://acme.bot/login');
                 // Redirect User
                 wp_safe_redirect($redirect_url);
                 exit;
@@ -752,7 +755,7 @@ if (!class_exists('AcmeBot')) {
                     foreach ($errors as $error) {
                         echo '<div class="notice notice-error is-dismissible"><p>' . esc_html($error) . '</p></div>';
                     }
-                    delete_transient('acmebot_settings_errors'); // Clear after displaying
+                    delete_transient('acmebot_settings_errors');
                 }
             }
 
@@ -761,7 +764,6 @@ if (!class_exists('AcmeBot')) {
                 echo '<div class="notice notice-success is-dismissible"><p>' .
                     esc_html__('AcmeBot integration setup and verification successful!', 'acme-bot') .
                     '</p></div>';
-                // Optionally, remove the query arg visually using JS or a redirect without it
             }
 
             // Check for failure message from setup redirect
@@ -769,35 +771,18 @@ if (!class_exists('AcmeBot')) {
                 echo '<div class="notice notice-warning is-dismissible"><p>' .
                     esc_html__('AcmeBot integration setup failed or verification could not be completed. Please check the connection or try again.', 'acme-bot') .
                     '</p></div>';
-                // Optionally, remove the query arg
             }
 
             // Check for message after activation redirect
             if (isset($_GET['acmebot_just_activated']) && $_GET['acmebot_just_activated'] === '1') {
-                // Don't show an error if secret isn't set yet on first activation visit
                 if (!get_option(self::SECRET_OPTION)) {
                     echo '<div class="notice notice-info is-dismissible"><p>' .
                         esc_html__('Welcome to AcmeBot! Please click the "Connect to AcmeBot" button below to complete the setup.', 'acme-bot') .
                         '</p></div>';
                 }
-                // Optionally, remove the query arg
             }
-
-            // General check: Remind user to connect if secret is missing (and not just activated)
-            $current_screen = get_current_screen();
-            if (
-                $current_screen && $current_screen->id === 'settings_page_acme-bot-integration' &&
-                !get_option(self::SECRET_OPTION) &&
-                !isset($_GET['acmebot_just_activated']) &&
-                !isset($_GET['acmebot_setup_fail']) // Don't show if setup just failed
-            ) {
-                echo '<div class="notice notice-warning is-dismissible"><p>' .
-                    esc_html__('AcmeBot is not yet connected. Click the "Connect to AcmeBot" button to start the integration.', 'acme-bot') .
-                    '</p></div>';
-            }
-        } // end display_admin_notices
-
-    } // End class AcmeBot
+        }
+    }
 
     // Instantiate the plugin class.
     new AcmeBot();

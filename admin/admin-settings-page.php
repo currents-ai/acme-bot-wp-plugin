@@ -27,7 +27,7 @@ $error_messages = get_transient('acmebot_settings_errors');
 $success_message = isset($_GET['acmebot_setup_success']) && $_GET['acmebot_setup_success'] === '1';
 ?>
 <div class="settings-wrap">
-    <h1 class="title"><?php echo esc_html(get_admin_page_title()); ?></h1>
+    <!-- <h1 class="title"><?php echo esc_html(get_admin_page_title()); ?></h1> -->
 
     <?php
     // Display error messages if any
@@ -57,21 +57,20 @@ $success_message = isset($_GET['acmebot_setup_success']) && $_GET['acmebot_setup
                         <img src="<?php echo esc_url($logo_url); ?>" alt="Acme Bot" class="acmebot-logo-img" />
                     </div>
 
+                    <h2 class="card-title"><?php esc_html_e('Automate content marketing with ACME BOT', 'acme-bot'); ?></h2>
                     <?php if ($is_integration_completed) : ?>
-                        <h2 class="card-title"><?php esc_html_e('Connection Active', 'acme-bot'); ?></h2>
                         <p><?php esc_html_e('Acme Bot is successfully connected to this site.', 'acme-bot'); ?></p>
                     <?php endif; ?>
 
                     <?php if (!$is_integration_completed) : ?>
-                        <h2 class="card-title"><?php esc_html_e('Connection is not Active', 'acme-bot') ?></h2>
                         <p><?php esc_html_e('Acme Bot connection is incomplete! Please try to reconnect.', 'acme-bot'); ?></p>
                     <?php endif; ?>
 
                     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="acmebot-connect-form">
                         <input type="hidden" name="action" value="acmebot_handle_form">
                         <?php wp_nonce_field('acmebot_settings_action', 'acmebot_settings_nonce'); ?>
-                        <div class="btn-center">
-                            <?php submit_button(__('Reconnect to Acme Bot', 'acme-bot'), 'primary large btn', 'submit', true); ?>
+                        <div class="items-center">
+                            <?php submit_button(__('Reconnect to Acme Bot', 'acme-bot'), 'primary large', 'submit', true); ?>
                         </div>
                     </form>
                     <p class="text-muted"><?php esc_html_e('If you need to refresh or update your connection, click "Reconnect".', 'acme-bot'); ?></p>
@@ -81,13 +80,13 @@ $success_message = isset($_GET['acmebot_setup_success']) && $_GET['acmebot_setup
                         <img src="<?php echo esc_url($logo_url); ?>" alt="Acme Bot" class="acmebot-logo-img" />
                     </div>
 
-                    <h2 class="card-title"><?php esc_html_e('Connect to Acme Bot', 'acme-bot'); ?></h2>
+                    <h2 class="card-title"><?php esc_html_e('Automate content marketing with ACME BOT', 'acme-bot'); ?></h2>
                     <p><?php esc_html_e('Set up your Acme Bot account to enable AI features on this site.', 'acme-bot'); ?></p>
                     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="acmebot-connect-form">
                         <input type="hidden" name="action" value="acmebot_handle_form">
                         <?php wp_nonce_field('acmebot_settings_action', 'acmebot_settings_nonce'); ?>
-                        <div class="btn-center">
-                            <?php submit_button(__('Connect to Acme Bot', 'acme-bot'), 'primary large btn', 'submit', true); ?>
+                        <div class="items-center">
+                            <?php submit_button(__('Connect to Acme Bot', 'acme-bot'), 'primary large', 'submit', true); ?>
                         </div>
                     </form>
                 <?php endif; ?>
@@ -216,60 +215,16 @@ $success_message = isset($_GET['acmebot_setup_success']) && $_GET['acmebot_setup
     }
 
 
-    /* Webhook Box */
-    .acmebot-webhook-box {
-        background: linear-gradient(145deg, #f5f9ff 0%, #eef3fa 100%);
-        border-radius: 12px;
-        padding: 16px 20px;
-        margin: 24px 0 16px 0;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        word-break: break-all;
-        border: 1px solid rgba(37, 99, 235, 0.1);
-    }
-
-    .acmebot-webhook-label {
-        font-size: 14px;
-        color: #4b5d78;
-        margin-bottom: 6px;
-        font-weight: 600;
-    }
-
-    .acmebot-connected-content code {
-        background: #e6edf7;
-        color: #0f172a;
-        border: none;
-        border-radius: 6px;
-        padding: 10px 14px;
-        font-size: 14px;
-        margin: 0;
-        font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
-        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
-        width: 100%;
-        display: block;
-    }
-
-    .text-muted {
-        color: #64748b;
-        font-size: 13px;
-        margin-top: 12px;
-        font-style: italic;
-    }
-
     /* Form */
-    .acmebot-connect-form {
-        margin-top: 32px;
-    }
 
-    .btn-center {
+    .items-center {
         display: flex;
         justify-content: center;
         align-items: center;
     }
 
     /* Connect Button */
-    .btn.button-primary.large {
+    .button-primary.button-large {
         background: linear-gradient(90deg, #2563eb 0%, #22d3ee 100%);
         border: none;
         color: #fff;
@@ -286,14 +241,14 @@ $success_message = isset($_GET['acmebot_setup_success']) && $_GET['acmebot_setup
         letter-spacing: 0.5px;
     }
 
-    .btn.button-primary.large:hover,
-    .btn.button-primary.large:focus {
+    .button-primary.button-large:hover,
+    .button-primary.button-large:focus {
         background: linear-gradient(90deg, #1e40af 0%, #06b6d4 100%);
         box-shadow: 0 6px 20px rgba(37, 99, 235, 0.35);
         transform: translateY(-2px);
     }
 
-    .btn.button-primary.large:active {
+    .button-primary.button-large:active {
         transform: translateY(1px);
         box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
     }
