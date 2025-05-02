@@ -657,21 +657,22 @@ if (!class_exists('AcmeBot')) {
 
                 $acme_auth_url = add_query_arg(
                     urlencode_deep([
-                        'webhook_url' => $webhook_url,
-                        'verify_url' => $verify_url,
-                        'post_url' => $post_url,
-                        'secret' => $secret,
-                        'username' => $username,
-                        'site' => $site_url,
-                        'connector_flow_type' => 'CONNECTOR_WORDPRESS_PLUGIN',
+                        'form_data.webhook_url' => $webhook_url,
+                        'form_data.verify_url' => $verify_url,
+                        'form_data.post_url' => $post_url,
+                        'form_data.secret' => $secret,
+                        'form_data.username' => $username,
+                        'form_data.site' => $site_url,
+                        'form_data.connector_flow_type' => 'CONNECTOR_WORDPRESS_PLUGIN',
+                        'update_form' => false,
                         'flow_type' => 'CONNECTOR',
                         // 'return_url_success' => admin_url('options-general.php?page=acme-bot-integration&acmebot_setup_success=1'), // URL to redirect back on success
-                        'return_url_fail' => admin_url('options-general.php?page=acme-bot-integration&acmebot_setup_fail=1'),
+                        'form_data.return_url_fail' => admin_url('options-general.php?page=acme-bot-integration&acmebot_setup_fail=1'),
                     ]),
                     urlencode(self::ACMEBOT_API_AUTHORIZE_URL)
                 );
 
-                $redirect_url = add_query_arg('redirect_path', urlencode($acme_auth_url), 'https://acme.bot/login');
+                $redirect_url = add_query_arg('redirect_path', urlencode($acme_auth_url), 'http://localhost:8080/login');
                 // Redirect User
                 wp_safe_redirect($redirect_url);
                 exit;
