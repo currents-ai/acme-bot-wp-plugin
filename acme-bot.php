@@ -15,6 +15,8 @@
  * License URI:     http://www.gnu.org/licenses/gpl-2.0.txt
  * Text Domain:     acme.bot
  * Domain Path:     /languages
+ * Requires at least: 4.7
+ * Requires PHP: 7.1
  */
 
 // If this file is called directly, abort.
@@ -79,7 +81,7 @@ if (!class_exists('AcmeBot')) {
          * The URL for the Acme Bot API authorization.
          * @var string
          */
-        const ACMEBOT_API_AUTHORIZE_URL = 'http://localhost:8001/d/{cust_id}/connectors/create';
+        const ACMEBOT_API_AUTHORIZE_URL = 'https://acme.bot/d/{cust_id}/connectors/create';
 
         /**
          * The host for the Acme Bot API.
@@ -664,7 +666,7 @@ if (!class_exists('AcmeBot')) {
                         'form_data.username' => $username,
                         'form_data.site' => $site_url,
                         'form_data.connector_flow_type' => 'CONNECTOR_WORDPRESS_PLUGIN',
-                        'update_form' => false,
+                        'update_form' => 'false',
                         'flow_type' => 'CONNECTOR',
                         // 'return_url_success' => admin_url('options-general.php?page=acme-bot-integration&acmebot_setup_success=1'), // URL to redirect back on success
                         'form_data.return_url_fail' => admin_url('options-general.php?page=acme-bot-integration&acmebot_setup_fail=1'),
@@ -672,7 +674,7 @@ if (!class_exists('AcmeBot')) {
                     urlencode(self::ACMEBOT_API_AUTHORIZE_URL)
                 );
 
-                $redirect_url = add_query_arg('redirect_path', urlencode($acme_auth_url), 'http://localhost:8080/login');
+                $redirect_url = add_query_arg('redirect_path', urlencode($acme_auth_url), 'https://acme.bot/login');
                 // Redirect User
                 wp_safe_redirect($redirect_url);
                 exit;
