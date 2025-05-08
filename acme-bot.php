@@ -15,6 +15,8 @@
  * License URI:     http://www.gnu.org/licenses/gpl-2.0.txt
  * Text Domain:     acme.bot
  * Domain Path:     /languages
+ * Requires at least: 4.7
+ * Requires PHP: 7.1
  */
 
 // If this file is called directly, abort.
@@ -79,7 +81,7 @@ if (!class_exists('AcmeBot')) {
          * The URL for the Acme Bot API authorization.
          * @var string
          */
-        const ACMEBOT_API_AUTHORIZE_URL = 'http://localhost:8001/d/{cust_id}/connectors/create';
+        const ACMEBOT_API_AUTHORIZE_URL = 'https://acme.bot/d/{cust_id}/connectors/create';
 
         /**
          * The host for the Acme Bot API.
@@ -657,16 +659,17 @@ if (!class_exists('AcmeBot')) {
 
                 $acme_auth_url = add_query_arg(
                     urlencode_deep([
-                        'webhook_url' => $webhook_url,
-                        'verify_url' => $verify_url,
-                        'post_url' => $post_url,
-                        'secret' => $secret,
-                        'username' => $username,
-                        'site' => $site_url,
-                        'connector_flow_type' => 'CONNECTOR_WORDPRESS_PLUGIN',
+                        'form_data.webhook_url' => $webhook_url,
+                        'form_data.verify_url' => $verify_url,
+                        'form_data.post_url' => $post_url,
+                        'form_data.secret' => $secret,
+                        'form_data.username' => $username,
+                        'form_data.site' => $site_url,
+                        'form_data.connector_flow_type' => 'CONNECTOR_WORDPRESS_PLUGIN',
+                        'update_form' => 'false',
                         'flow_type' => 'CONNECTOR',
                         // 'return_url_success' => admin_url('options-general.php?page=acme-bot-integration&acmebot_setup_success=1'), // URL to redirect back on success
-                        'return_url_fail' => admin_url('options-general.php?page=acme-bot-integration&acmebot_setup_fail=1'),
+                        'form_data.return_url_fail' => admin_url('options-general.php?page=acme-bot-integration&acmebot_setup_fail=1'),
                     ]),
                     urlencode(self::ACMEBOT_API_AUTHORIZE_URL)
                 );
