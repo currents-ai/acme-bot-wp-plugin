@@ -251,19 +251,6 @@ if (!class_exists('AcmeBot')) {
         public function handle_verification(WP_REST_Request $request): WP_REST_Response
         {
 
-
-            // // --- CORS Headers ---
-            // header('Access-Control-Allow-Origin: https://acme.bot');
-            // header('Access-Control-Allow-Methods: POST, OPTIONS');
-            // header('Access-Control-Allow-Headers: Content-Type, x-secret');
-
-            // // Handle preflight OPTIONS request
-            // if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-            //     // Return empty response for preflight
-            //     return new WP_REST_Response(null, 204);
-            // }
-
-
             // 1. Verify Secret
             $verification_result = $this->verify_secret($request);
             if (is_wp_error($verification_result) || $verification_result instanceof WP_REST_Response) {
@@ -273,13 +260,13 @@ if (!class_exists('AcmeBot')) {
             try {
                 // 2. Get Author ID (the user who set up the integration)
                 $author_id = get_option(self::INTEGRATING_USER_ID_OPTION, self::DEFAULT_AUTHOR_ID);
+
                 if (!get_user_by('ID', $author_id)) {
                     error_log('AcmeBot Verification Error: Stored integrating user ID (' . $author_id . ') is invalid.');
-                    // Fallback or fail? Let's fail clearly.
                     return new WP_REST_Response([
                         'status' => 'ERROR',
                         'message' => __('Verification failed: Configured author user ID is invalid.', 'acme-bot'),
-                    ], 500);
+                    ], 403);
                 }
 
 
@@ -295,31 +282,32 @@ if (!class_exists('AcmeBot')) {
                 $test_post_id = wp_insert_post($test_post_data, true); // Pass true to return WP_Error on failure
 
                 if (is_wp_error($test_post_id)) {
+                    $error_code = $test_post_id->get_error_code();
+                    $status_code = 500;
+
+                    if (in_array($error_code, ['insufficient_permissions', 'invalid_author'])) {
+                        $status_code = 403;
+                    }
+
                     error_log('AcmeBot Verification Error: Failed to create test post. WP_Error: ' . $test_post_id->get_error_message());
+
                     return new WP_REST_Response([
                         'status' => 'ERROR',
                         'message' => sprintf(__('Verification failed: Could not create test post. Error: %s', 'acme-bot'), $test_post_id->get_error_message()),
-                    ], 500); // Internal server error likely due to permissions or DB issue
+                    ], $status_code);
                 }
 
-                // 5. Attempt to Delete Test Post Immediately
-                // Use force delete (true) to bypass trash
                 $delete_result = wp_delete_post($test_post_id, true);
 
                 if (!$delete_result) {
-                    // Deletion failed, this is problematic but maybe not critical for *verification*?
-                    // Log it, but maybe still return success as creation worked?
-                    // Let's treat deletion failure as a verification failure for robustness.
                     error_log('AcmeBot Verification Error: Failed to delete test post ID: ' . $test_post_id);
-                    // Attempt to trash it as a fallback? Or just report error.
                     wp_trash_post($test_post_id); // Try trashing at least
                     return new WP_REST_Response([
                         'status' => 'ERROR',
                         'message' => __('Verification partially failed: Could not automatically delete test post. Please check trash.', 'acme-bot'),
-                    ], 500);
+                    ], 207);
                 }
 
-                // Optionally, set a flag indicating successful verification if needed elsewhere
                 update_option(self::IS_INTEGRATION_COMPLETED, true);
 
                 return new WP_REST_Response([
