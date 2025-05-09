@@ -341,7 +341,6 @@ if (!class_exists('AcmeBot')) {
                 return $verification_result;
             }
 
-            // Check if integration was created
             if (!$is_integration_completed) {
                 return new WP_REST_Response([
                     'status' => 'ERROR',
@@ -351,17 +350,7 @@ if (!class_exists('AcmeBot')) {
 
 
             try {
-                // 2. Process the Event
-                $event = $request->get_param('event');
                 $payload = $request->get_param('payload');
-
-                // Basic validation
-                if (empty($event)) {
-                    return new WP_REST_Response([
-                        'status' => 'ERROR',
-                        'message' => __('Missing required parameter: event', 'acme-bot')
-                    ], 400);
-                }
                 if (empty($payload)) {
                     return new WP_REST_Response([
                         'status' => 'ERROR',
@@ -369,24 +358,7 @@ if (!class_exists('AcmeBot')) {
                     ], 400);
                 }
 
-
-                switch ($event) {
-                    case self::EVENT_INTEGRATION_CREATED:
-                        return new WP_REST_Response([
-                            'status' => 'SUCCESS', // Use consistent status
-                            'message' => __('Webhook received integration confirmation.', 'acme-bot') // Clearer message
-                        ], 200);
-
-                    case self::EVENT_CREATE_POST:
-                        return $this->handle_create_post($payload);
-
-                    default:
-                        // Event type not recognized
-                        return new WP_REST_Response([
-                            'status' => 'ERROR',
-                            'message' => __('Event not recognized', 'acme-bot')
-                        ], 400);
-                }
+                return $this->handle_create_post($payload);
             } catch (Exception $e) {
                 // Log the full exception for debugging
                 error_log('AcmeBot Webhook Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
