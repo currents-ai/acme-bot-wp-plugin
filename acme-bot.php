@@ -6,17 +6,15 @@
  * @package           AcmeBot
  *
  * @wordpress-plugin
- * Plugin Name:     Acme Bot
- * Description:     Acme Bot - AI content agent for WordPress.
+ * Plugin Name:     ACME.BOT - AI SEO Writer & Content Generator
+ * Description:     Run your WordPress blog on auto-pilot with ACME.BOT - the fully automated AI SEO writer that creates deep-researched, publish-ready content with AI diagrams.
  * Version:         1.0.0 
- * Author:          Acme Bot Team
+ * Author:          ACME.BOT
  * Author URI:      https://acme.bot/
  * License:         GPL-2.0 or later
  * License URI:     http://www.gnu.org/licenses/gpl-2.0.txt
- * Text Domain:     acme.bot
- * Domain Path:     /languages
- * Requires at least: 4.7
- * Requires PHP: 7.1
+ * Requires at least: 5.0
+ * Requires PHP: 7.4
  */
 
 // If this file is called directly, abort.
@@ -24,69 +22,40 @@ if (!defined('WPINC')) {
     die;
 }
 
-
-
 if (!class_exists('AcmeBot')) {
     /**
      * The core plugin class.
      */
     class AcmeBot
     {
-        /**
-         * The current version of the REST API.
-         * @var int
-         */
+        /** REST API version */
         const REST_VERSION = 1;
 
-        /**
-         * The option name used to store the secret key.
-         * @var string
-         */
+        /** Option for secret key storage */
         const SECRET_OPTION = 'acmebot_secret';
 
-        /**
-         * The option name used to store the ID of the user who initiated the integration.
-         * Used as the default author and for verification tests.
-         * @var string
-         */
+        /** Option for the user ID who initiated integration (default author) */
         const INTEGRATING_USER_ID_OPTION = 'acmebot_default_author_id';
-        /**
-         * Event name for integration creation confirmation.
-         * This is used to confirm that the integration was successfully created.
-         * @var bool
-         */
 
+        /** Flag for completed integration */
         const IS_INTEGRATION_COMPLETED = 'acmebot_integration_completed';
 
-        /**
-         * Event name for integration creation confirmation.
-         * @var string
-         */
+        /** Integration created event */
         const EVENT_INTEGRATION_CREATED = 'integration_created';
 
-        /**
-         * Event name for creating a new post via webhook.
-         * @var string
-         */
+        /** Post creation event */
         const EVENT_CREATE_POST = 'create_post';
 
-        /**
-         * Default User ID to use if none provided or invalid in webhook/setup.
-         * Usually ID 1 is the first admin user.
-         * @var int
-         */
+        /** Default admin user ID */
         const DEFAULT_AUTHOR_ID = 1;
 
-        /**
-         * The URL for the Acme Bot API authorization.
-         * @var string
-         */
-        const ACMEBOT_API_AUTHORIZE_URL = 'https://acme.bot/d/{cust_id}/connectors/create';
+        /** Base URL for API endpoints */
+        const BASE_URL = 'http://localhost:8001'; // 'https://acme.bot';
 
-        /**
-         * The host for the Acme Bot API.
-         * @var string
-         */
+        /** API authorization URL */
+        const ACMEBOT_API_AUTHORIZE_URL = self::BASE_URL . '/d/{cust_id}/connectors/create';
+
+        /** API host domain */
         const ACMEBOT_API_HOST = 'acme.bot';
 
         /**
@@ -95,22 +64,16 @@ if (!class_exists('AcmeBot')) {
         public function __construct()
         {
             // Register REST API endpoints
-            add_action('rest_api_init', [$this, 'register_rest_routes']); // Renamed for clarity
+            add_action('rest_api_init', [$this, 'register_rest_routes']);
 
             // Admin specific hooks
             if (is_admin()) {
-                // Add settings link on plugin page
                 add_filter('plugin_action_links_' . plugin_basename(__FILE__), [$this, 'add_settings_link']);
-                // Add allowed redirect host for the webhook URL 
                 add_filter('allowed_redirect_hosts', [$this, 'add_acmebot_allowed_host']);
-                // Add settings page to menu
                 add_action('admin_menu', [$this, 'add_plugin_page']);
-                // Handle form submission for generating secret/redirecting
                 add_action('admin_post_acmebot_handle_form', [$this, 'handle_form_submission']);
-                // Display admin notices (e.g., errors, success messages)
-                add_action('admin_notices', [$this, 'display_admin_notices']); // Consolidated notice display
-                // Redirect to settings page after activation
-                add_action('admin_init', [$this, 'handle_activation_redirect']); // Renamed for clarity
+                add_action('admin_notices', [$this, 'display_admin_notices']);
+                add_action('admin_init', [$this, 'handle_activation_redirect']);
 
                 // Cors preflight
                 add_filter('rest_pre_serve_request', function ($served, $result) {
@@ -120,21 +83,18 @@ if (!class_exists('AcmeBot')) {
                     return $served;
                 }, 10, 2);
 
-                // Register activation hook to set up the plugin
                 register_activation_hook(__FILE__, ['AcmeBot', 'activate']);
-                // Register deactivation hook to clean up options
-                register_deactivation_hook(__FILE__, ['AcmeBot', 'deactivate']); // Made static for consistency
+                register_deactivation_hook(__FILE__, ['AcmeBot', 'deactivate']);
             }
         }
 
         /**
          * Activation hook callback.
-         * Sets a transient to trigger redirect on first admin load after activation.
          */
         public static function activate(): void
         {
             set_transient('acmebot_activation_redirect', true, 30);
-            // We might initialize default options here if needed in the future
+
             if (!get_option(self::INTEGRATING_USER_ID_OPTION)) {
                 update_option(self::INTEGRATING_USER_ID_OPTION, self::DEFAULT_AUTHOR_ID);
             }
@@ -142,57 +102,62 @@ if (!class_exists('AcmeBot')) {
 
         /**
          * Deactivation hook callback.
-         * Cleans up the stored secret and integrating user ID options.
          */
         public static function deactivate(): void
         {
             delete_option(self::SECRET_OPTION);
             delete_option(self::INTEGRATING_USER_ID_OPTION);
             delete_option(self::IS_INTEGRATION_COMPLETED);
-            delete_transient('acmebot_settings_errors'); // Clean up transients too
+            delete_transient('acmebot_settings_errors');
             delete_transient('acmebot_activation_redirect');
         }
 
-
         /**
-         * Handles the redirect to the settings page after plugin activation.
-         * Runs on admin_init hook.
+         * Handles redirect to settings page after plugin activation.
          */
         public function handle_activation_redirect(): void
         {
             if (get_transient('acmebot_activation_redirect')) {
                 delete_transient('acmebot_activation_redirect');
-                // Ensure this is not a bulk activation action
-                if (!isset($_GET['activate-multi'])) {
-                    wp_safe_redirect(admin_url('options-general.php?page=acme-bot-integration&acmebot_just_activated=1'));
+
+                $activate_multi = sanitize_key(filter_input(INPUT_GET, 'activate-multi', FILTER_SANITIZE_FULL_SPECIAL_CHARS));
+
+                if (empty($activate_multi)) {
+                    wp_safe_redirect(add_query_arg(
+                        [
+                            'page' => 'acme-bot-integration',
+                            'acmebot_just_activated' => '1',
+                            'acmebot_nonce' => wp_create_nonce('acmebot_admin_notices')
+                        ],
+                        admin_url('options-general.php')
+                    ));
                     exit;
                 }
             }
         }
 
+        public static function get_asset_url($relative_path)
+        {
+            return plugins_url('assets/' . $relative_path, __FILE__);
+        }
+
         /**
-         * Register the REST API routes for the webhook and verification.
+         * Register REST API routes.
          */
-        public function register_rest_routes(): void // Changed name
+        public function register_rest_routes(): void
         {
             $namespace = 'acmebot/v' . self::REST_VERSION . '/webhook';
 
-            // Webhook route for receiving events (like create_post)
+            // Webhook route for events
             register_rest_route($namespace, '/posts', [
-                'methods' => WP_REST_Server::CREATABLE, // POST
+                'methods' => WP_REST_Server::CREATABLE,
                 'callback' => [$this, 'create_post'],
-                'permission_callback' => '__return_true', // Security handled internally via secret
+                'permission_callback' => '__return_true',
                 'args' => [
-                    'event' => [
-                        'required' => true,
-                        'type' => 'string',
-                        'description' => __('The type of event being triggered.', 'acme-bot'),
-                        'enum' => [self::EVENT_INTEGRATION_CREATED, self::EVENT_CREATE_POST], // Document possible events
-                    ],
                     'payload' => [
                         'required' => true,
                         'type' => 'object',
-                        'description' => __('The data associated with the event.', 'acme-bot'),
+                        'description' => 'The data associated with the post.',
                         'properties' => [
                             'title' => ['type' => 'string'],
                             'content' => ['type' => 'string'],
@@ -200,29 +165,27 @@ if (!class_exists('AcmeBot')) {
                             'user_name' => ['type' => 'string'],
                             'categories' => ['type' => 'array', 'items' => ['type' => ['string', 'integer']]],
                         ],
-
                     ],
                 ],
             ]);
 
-            // Verification route used after setup redirection
+            // Verification route
             register_rest_route($namespace, '/verify', [
-                'methods' => WP_REST_Server::CREATABLE, // POST
+                'methods' => WP_REST_Server::CREATABLE,
                 'callback' => [$this, 'handle_verification'],
-                'permission_callback' => '__return_true', // Security handled internally via secret
+                'permission_callback' => '__return_true',
                 'args' => [
-                    // Optional: could include user_id or other check from Acme side
                     'verification_token' => [
-                        'required' => false, // Example: maybe Acme sends back a temporary token?
+                        'required' => false,
                         'type' => 'string',
-                        'description' => __('Optional verification token.', 'acme-bot'),
+                        'description' => 'Optional verification token.',
                     ],
                 ],
             ]);
         }
 
         /**
-         * Verify the request secret against the stored secret.
+         * Verify the request secret.
          *
          * @param WP_REST_Request $request The request object.
          * @return bool|WP_REST_Response True if valid, WP_REST_Response on failure.
@@ -235,51 +198,47 @@ if (!class_exists('AcmeBot')) {
             if (empty($received_secret) || empty($stored_secret) || !hash_equals((string) $stored_secret, (string) $received_secret)) {
                 return new WP_REST_Response([
                     'status' => 'ERROR',
-                    'message' => __('Unauthorized: Invalid or missing secret.', 'acme-bot'),
+                    'message' => 'Unauthorized: Invalid or missing secret.',
                 ], 401);
             }
             return true;
         }
 
         /**
-         * Handle incoming verification requests.
-         * Attempts to create and delete a test post to confirm integration works.
+         * Handle verification requests.
          *
          * @param WP_REST_Request $request Full data about the request.
          * @return WP_REST_Response Response object.
          */
         public function handle_verification(WP_REST_Request $request): WP_REST_Response
         {
-
-            // 1. Verify Secret
+            // Verify Secret
             $verification_result = $this->verify_secret($request);
             if (is_wp_error($verification_result) || $verification_result instanceof WP_REST_Response) {
                 return $verification_result;
             }
 
             try {
-                // 2. Get Author ID (the user who set up the integration)
+                // Get Author ID
                 $author_id = get_option(self::INTEGRATING_USER_ID_OPTION, self::DEFAULT_AUTHOR_ID);
 
                 if (!get_user_by('ID', $author_id)) {
-                    error_log('AcmeBot Verification Error: Stored integrating user ID (' . $author_id . ') is invalid.');
                     return new WP_REST_Response([
                         'status' => 'ERROR',
-                        'message' => __('Verification failed: Configured author user ID is invalid.', 'acme-bot'),
+                        'message' => 'Verification failed: Configured author user ID is invalid.',
                     ], 403);
                 }
 
-
-                // 3. Prepare Test Post Data
+                // Prepare Test Post Data
                 $test_post_data = [
-                    'post_title'   => sprintf(__('AcmeBot Verification Post - %s', 'acme-bot'), time()),
-                    'post_content' => __('This is a temporary post created automatically during AcmeBot integration verification. It should be deleted immediately.', 'acme-bot'),
-                    'post_status'  => 'draft', // Use draft to avoid appearing on the live site
+                    'post_title'   => sprintf('AcmeBot Verification Post - %s', time()),
+                    'post_content' => 'This is a temporary post created automatically during AcmeBot integration verification. It should be deleted immediately.',
+                    'post_status'  => 'draft',
                     'post_author'  => $author_id,
                 ];
 
-                // 4. Attempt to Create Test Post
-                $test_post_id = wp_insert_post($test_post_data, true); // Pass true to return WP_Error on failure
+                // Create Test Post
+                $test_post_id = wp_insert_post($test_post_data, true);
 
                 if (is_wp_error($test_post_id)) {
                     $error_code = $test_post_id->get_error_code();
@@ -289,22 +248,19 @@ if (!class_exists('AcmeBot')) {
                         $status_code = 403;
                     }
 
-                    error_log('AcmeBot Verification Error: Failed to create test post. WP_Error: ' . $test_post_id->get_error_message());
-
                     return new WP_REST_Response([
                         'status' => 'ERROR',
-                        'message' => sprintf(__('Verification failed: Could not create test post. Error: %s', 'acme-bot'), $test_post_id->get_error_message()),
+                        'message' => sprintf('Verification failed: Could not create test post. Error: %s', $test_post_id->get_error_message()),
                     ], $status_code);
                 }
 
                 $delete_result = wp_delete_post($test_post_id, true);
 
                 if (!$delete_result) {
-                    error_log('AcmeBot Verification Error: Failed to delete test post ID: ' . $test_post_id);
-                    wp_trash_post($test_post_id); // Try trashing at least
+                    wp_trash_post($test_post_id);
                     return new WP_REST_Response([
                         'status' => 'ERROR',
-                        'message' => __('Verification partially failed: Could not automatically delete test post. Please check trash.', 'acme-bot'),
+                        'message' => 'Verification partially failed: Could not automatically delete test post. Please check trash.',
                     ], 207);
                 }
 
@@ -312,62 +268,54 @@ if (!class_exists('AcmeBot')) {
 
                 return new WP_REST_Response([
                     'status' => 'SUCCESS',
-                    'message' => __('AcmeBot integration verified successfully.', 'acme-bot'),
+                    'message' => 'AcmeBot integration verified successfully.',
                 ], 200);
             } catch (Exception $e) {
-                error_log('AcmeBot Verification Exception: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
                 return new WP_REST_Response([
                     'status' => 'ERROR',
-                    'message' => sprintf(__('An unexpected error occurred during verification: %s', 'acme-bot'), $e->getMessage()),
+                    'message' => sprintf('An unexpected error occurred during verification: %s', $e->getMessage()),
                 ], 500);
             }
         }
 
-
         /**
-         * Handle incoming webhook requests.
+         * Handle webhook requests.
          *
          * @param WP_REST_Request $request Full data about the request.
          * @return WP_REST_Response Response object.
          */
         public function create_post(WP_REST_Request $request): WP_REST_Response
         {
-
-            // 1. Verify Secret
+            // Verify Secret
             $verification_result = $this->verify_secret($request);
             $is_integration_completed = get_option(self::IS_INTEGRATION_COMPLETED, false);
             if (is_wp_error($verification_result) || $verification_result instanceof WP_REST_Response) {
-                // verify_secret already returns a WP_REST_Response with 401 status
                 return $verification_result;
             }
 
             if (!$is_integration_completed) {
                 return new WP_REST_Response([
                     'status' => 'ERROR',
-                    'message' => __('Integration not created or verified. Please check the setup.', 'acme-bot'),
-                ], 403); // Forbidden
+                    'message' => 'Integration not created or verified. Please check the setup.',
+                ], 403);
             }
-
 
             try {
                 $payload = $request->get_param('payload');
                 if (empty($payload)) {
                     return new WP_REST_Response([
                         'status' => 'ERROR',
-                        'message' => __('Missing required parameter: payload', 'acme-bot')
+                        'message' => 'Missing required parameter: payload'
                     ], 400);
                 }
 
                 return $this->handle_create_post($payload);
             } catch (Exception $e) {
-                // Log the full exception for debugging
-                error_log('AcmeBot Webhook Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
 
-                // Return a controlled error response
                 return new WP_REST_Response(
                     [
                         'status' => 'ERROR',
-                        'message' => sprintf(__('Error processing webhook: %s', 'acme-bot'), $e->getMessage())
+                        'message' => sprintf('Error processing webhook: %s', $e->getMessage())
                     ],
                     500
                 );
@@ -375,84 +323,74 @@ if (!class_exists('AcmeBot')) {
         }
 
         /**
-         * Handle the create_post event from the webhook.
+         * Handle the create_post event.
          * 
          * @param array|object $payload The payload for the create_post event.
          * @return WP_REST_Response Response object.
          */
         private function handle_create_post($payload): WP_REST_Response
         {
-
             try {
-                // Check if we're updating an existing post
+                // Check if updating existing post
                 $is_update = isset($payload['post_id']) && is_numeric($payload['post_id']) && $payload['post_id'] > 0;
                 $post_id = $is_update ? absint($payload['post_id']) : 0;
                 $existing_post = null;
 
-                // Verify post exists if we're updating
+                // Verify post exists if updating
                 if ($is_update) {
                     $existing_post = get_post($post_id);
                     if (!$existing_post) {
                         return new WP_REST_Response([
                             'status' => 'ERROR',
-                            'message' => __('Invalid post_id: Post does not exist.', 'acme-bot'),
-                        ], 404); // 404 Not Found is more appropriate
+                            'message' => 'Invalid post_id: Post does not exist.',
+                        ], 404);
                     }
                 }
 
-                // Get title and content using null coalescing operator
+                // Get title and content
                 $title = $payload['title'] ?? null;
                 $content = $payload['content'] ?? null;
 
-                // Validate required fields for *new* posts
+                // Validate required fields for new posts
                 if (!$is_update && (empty($title) || !isset($content))) {
                     return new WP_REST_Response([
                         'status' => 'ERROR',
-                        'message' => __('Invalid payload: title is required and content must be present for new posts', 'acme-bot'),
+                        'message' => 'Invalid payload: title is required and content must be present for new posts',
                     ], 400);
                 }
 
-                // --- Post Author Handling ---
-                $author_id = get_option(self::INTEGRATING_USER_ID_OPTION, self::DEFAULT_AUTHOR_ID); // Start with configured user or default
+                // Post Author Handling
+                $author_id = get_option(self::INTEGRATING_USER_ID_OPTION, self::DEFAULT_AUTHOR_ID);
 
-                // If updating, keep existing author unless explicitly overridden
+                // If updating, keep existing author unless overridden
                 if ($is_update && $existing_post) {
                     $author_id = $existing_post->post_author;
                 }
 
-                // Allow overriding author via payload (check ID first, then name)
+                // Allow overriding author via payload
                 $potential_author_id = null;
                 if (isset($payload['user_id']) && is_numeric($payload['user_id']) && absint($payload['user_id']) > 0) {
                     $potential_author_id = absint($payload['user_id']);
                 } elseif (isset($payload['user_name']) && is_string($payload['user_name']) && !empty(trim($payload['user_name']))) {
                     $username = sanitize_user(trim($payload['user_name']));
-                    $user = get_user_by('login', $username); // Check login name first
-                    if (!$user) { // Then check display name
+                    $user = get_user_by('login', $username);
+                    if (!$user) {
                         $users = get_users(['search' => $username, 'search_columns' => ['display_name'], 'number' => 1]);
                         $user = !empty($users) ? $users[0] : null;
                     }
                     if ($user) {
                         $potential_author_id = $user->ID;
-                    } else {
-                        error_log('AcmeBot Webhook: Could not find user by name: ' . trim($payload['user_name']));
                     }
                 }
 
-                // If a valid user was found in payload, check if they can publish/edit, then use them.
+                // Check if potential author has required capabilities
                 if ($potential_author_id && get_user_by('ID', $potential_author_id)) {
-                    // Check capabilities (important!)
                     if (user_can($potential_author_id, 'publish_posts') && user_can($potential_author_id, 'edit_posts')) {
                         $author_id = $potential_author_id;
-                    } else {
-                        error_log('AcmeBot Webhook: User ID ' . $potential_author_id . ' provided in payload lacks publishing/editing capabilities. Using default author ID: ' . $author_id);
                     }
-                } elseif ($potential_author_id) {
-                    // ID or Name was provided but user doesn't exist
-                    error_log('AcmeBot Webhook: User ID/Name provided in payload (' . ($payload['user_id'] ?? $payload['user_name']) . ') is invalid or user not found. Using default author ID: ' . $author_id);
                 }
 
-
-                // --- Category Handling ---
+                // Category Handling
                 $category_ids = [];
                 if (isset($payload['categories']) && is_array($payload['categories'])) {
                     foreach ($payload['categories'] as $category_ref) {
@@ -460,7 +398,7 @@ if (!class_exists('AcmeBot')) {
                         if (is_int($category_ref) || (is_string($category_ref) && is_numeric($category_ref))) {
                             // Assume it's an ID
                             $term = term_exists(absint($category_ref), 'category');
-                            if ($term !== 0 && $term !== null) { // term_exists returns array or null/0
+                            if ($term !== 0 && $term !== null) {
                                 $cat_id = (int)$term['term_id'];
                             }
                         } elseif (is_string($category_ref) && !empty(trim($category_ref))) {
@@ -474,9 +412,6 @@ if (!class_exists('AcmeBot')) {
                                 $new_cat = wp_insert_term($category_name, 'category');
                                 if (!is_wp_error($new_cat) && isset($new_cat['term_id'])) {
                                     $cat_id = (int)$new_cat['term_id'];
-                                    error_log('AcmeBot Webhook: Created new category "' . $category_name . '" (ID: ' . $cat_id . ')');
-                                } else {
-                                    error_log('AcmeBot Webhook: Failed to create category "' . $category_name . '". Error: ' . (is_wp_error($new_cat) ? $new_cat->get_error_message() : 'Unknown error'));
                                 }
                             }
                         }
@@ -487,20 +422,18 @@ if (!class_exists('AcmeBot')) {
                     }
                 }
 
-                // --- Sanitize and Prepare Post Data ---
+                // Sanitize and Prepare Post Data
                 $post_data = [
-                    'post_status' => $payload['post_status'] ?? ($is_update ? $existing_post->post_status : 'publish'), // Allow status override, default publish for new
-                    'post_type'   => $payload['post_type'] ?? ($is_update ? $existing_post->post_type : 'post'), // Allow post type override
+                    'post_status' => $payload['post_status'] ?? ($is_update ? $existing_post->post_status : 'publish'),
+                    'post_type'   => $payload['post_type'] ?? ($is_update ? $existing_post->post_type : 'post'),
                     'post_author' => $author_id,
-                    // Add more fields if needed (e.g., post_date, post_excerpt, meta_input)
                 ];
 
-                // Only include fields if they are explicitly provided in the payload or required
+                // Include fields if provided or required
                 if (isset($title)) {
                     $post_data['post_title'] = sanitize_text_field($title);
                 }
                 if (isset($content)) {
-                    // Be careful with kses, ensure it allows necessary tags from AcmeBot
                     $post_data['post_content'] = wp_kses_post($content);
                 }
                 if (!empty($category_ids)) {
@@ -510,104 +443,91 @@ if (!class_exists('AcmeBot')) {
                 // For updates, set the ID
                 if ($is_update) {
                     $post_data['ID'] = $post_id;
-                    // If title/content not provided for update, they won't be changed.
                 } else {
-                    // Ensure essential fields have defaults if not provided for new posts
-                    if (!isset($post_data['post_title'])) $post_data['post_title'] = __('Untitled Post', 'acme-bot'); // Default title
-                    if (!isset($post_data['post_content'])) $post_data['post_content'] = ''; // Default content
+                    if (!isset($post_data['post_title'])) $post_data['post_title'] = 'Untitled Post';
+                    if (!isset($post_data['post_content'])) $post_data['post_content'] = '';
                 }
 
-                // --- Insert or Update Post ---
-                $result_post_id = wp_insert_post($post_data, true); // Pass true for WP_Error return
+                // Insert or Update Post
+                $result_post_id = wp_insert_post($post_data, true);
 
                 // Check for errors
                 if (is_wp_error($result_post_id)) {
                     $action = $is_update ? 'update' : 'create';
-                    error_log("AcmeBot Error: Failed to {$action} post via webhook. WP_Error: " . $result_post_id->get_error_message());
                     return new WP_REST_Response(
                         [
                             'status' => 'ERROR',
-                            'message' => sprintf(__("Failed to {$action} post: %s", 'acme-bot'), $result_post_id->get_error_message()),
+                            'message' => sprintf("Failed to {$action} post: %s", $result_post_id->get_error_message()),
                         ],
-                        500 // Internal Server Error
+                        500
                     );
                 }
 
-                // --- Success ---
+                // Success
                 $post_url = get_permalink($result_post_id);
                 $action = $is_update ? 'updated' : 'created';
-                $status_code = $is_update ? 200 : 201; // 201 Created for new posts
+                $status_code = $is_update ? 200 : 201;
 
                 return new WP_REST_Response([
                     'status' => 'SUCCESS',
-                    'message' => sprintf(__('Post %s successfully', 'acme-bot'), $action),
-                    'data' => [ // Nest details under 'data'
+                    'message' => sprintf('Post %s successfully', $action),
+                    'data' => [
                         'post_id' => $result_post_id,
                         'url' => $post_url,
                     ]
                 ], $status_code);
             } catch (Exception $e) {
-                error_log('AcmeBot Error in post handler: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
                 return new WP_REST_Response([
                     'status' => 'ERROR',
-                    'message' => sprintf(__('Error handling post creation/update: %s', 'acme-bot'), $e->getMessage()),
+                    'message' => sprintf('Error handling post creation/update: %s', $e->getMessage()),
                 ], 500);
             }
         }
 
-
         /**
-         * Handles the form submission from the settings page.
-         * Generates a strong secret, saves it, stores the integrating user ID,
-         * and redirects to the external service for authorization.
+         * Handles form submission from the settings page.
          */
         public function handle_form_submission(): void
         {
             $errors = [];
 
-            // 1. Verify Nonce
+            // Verify Nonce
             if (!isset($_POST['acmebot_settings_nonce']) || !wp_verify_nonce(sanitize_key($_POST['acmebot_settings_nonce']), 'acmebot_settings_action')) {
-                $errors[] = __('Security check failed. Please try submitting the form again.', 'acme-bot');
+                $errors[] = 'Security check failed. Please try submitting the form again.';
             }
 
-            // 2. Check Capabilities
+            // Check Capabilities
             if (!current_user_can('manage_options')) {
-                $errors[] = __('You do not have permission to manage options.', 'acme-bot');
-                // manage_options usually implies edit/publish, but let's be explicit for clarity
+                $errors[] = 'You do not have permission to manage options.';
             }
             if (!current_user_can('publish_posts') || !current_user_can('edit_posts')) {
-                $errors[] = __('You need permissions to publish and edit posts to set up this integration.', 'acme-bot');
+                $errors[] = 'You need permissions to publish and edit posts to set up this integration.';
             }
 
-
-            // 3. Get Current User ID
+            // Get Current User ID
             $integrating_user_id = get_current_user_id();
-            if ($integrating_user_id <= 0) { // Check if ID is valid
-                $errors[] = __('Could not identify the current logged-in user.', 'acme-bot');
+            if ($integrating_user_id <= 0) {
+                $errors[] = 'Could not identify the current logged-in user.';
             }
 
             // Handle errors
             if (!empty($errors)) {
-                set_transient('acmebot_settings_errors', $errors, 300); // Store for 5 minutes
-                wp_safe_redirect(add_query_arg('acmebot_error', '1', admin_url('options-general.php?page=acme-bot-integration')));
+                set_transient('acmebot_settings_errors', $errors, 300);
+                wp_safe_redirect(add_query_arg([
+                    'acmebot_error' => '1',
+                    'acmebot_nonce' => wp_create_nonce('acmebot_admin_notices')
+                ],  admin_url('options-general.php?page=acme-bot-integration')));
                 exit;
             }
 
             // Proceed if no errors
             try {
-                // Store the integrating user's ID as the default author
-                if (!update_option(self::INTEGRATING_USER_ID_OPTION, $integrating_user_id)) {
-                    // Log a warning if update failed, but maybe proceed? The default might exist.
-                    error_log('AcmeBot Setup Warning: Failed to update the integrating user ID option (' . self::INTEGRATING_USER_ID_OPTION . ') to ' . $integrating_user_id . '. Using previous or default value.');
-                }
+                // Store the integrating user's ID as default author
+                update_option(self::INTEGRATING_USER_ID_OPTION, $integrating_user_id);
 
-
-                // Generate and Store Strong Secret
+                // Generate and Store Secret
                 $secret = wp_generate_password(128, false);
-                if (!update_option(self::SECRET_OPTION, $secret)) {
-                    // This is critical, throw an error if secret saving fails
-                    throw new Exception(__('Failed to save the integration secret key to the database.', 'acme-bot'));
-                }
+                update_option(self::SECRET_OPTION, $secret);
 
                 $namespace = 'acmebot/v' . self::REST_VERSION . '/webhook';
                 $webhook_url = rest_url($namespace);
@@ -628,18 +548,15 @@ if (!class_exists('AcmeBot')) {
                         'form_data.connector_flow_type' => 'CONNECTOR_WORDPRESS_PLUGIN',
                         'update_form' => 'false',
                         'flow_type' => 'CONNECTOR',
-                        // 'return_url_success' => admin_url('options-general.php?page=acme-bot-integration&acmebot_setup_success=1'), // URL to redirect back on success
-                        'form_data.return_url_fail' => admin_url('options-general.php?page=acme-bot-integration&acmebot_setup_fail=1'),
+                        // 'form_data.return_url_fail' => admin_url('options-general.php?page=acme-bot-integration&acmebot_setup_fail=1'),
                     ]),
                     urlencode(self::ACMEBOT_API_AUTHORIZE_URL)
                 );
 
-                $redirect_url = add_query_arg('redirect_path', urlencode($acme_auth_url), 'https://acme.bot/login');
-                // Redirect User
+                $redirect_url = add_query_arg('redirect_path', urlencode($acme_auth_url), self::BASE_URL . '/login');
                 wp_safe_redirect($redirect_url);
                 exit;
             } catch (Exception $e) {
-                error_log('Acme Bot Setup Error: ' . $e->getMessage());
                 set_transient('acmebot_settings_errors', [$e->getMessage()], 300);
                 wp_safe_redirect(add_query_arg('acmebot_error', '1', admin_url('options-general.php?page=acme-bot-integration')));
                 exit;
@@ -647,22 +564,21 @@ if (!class_exists('AcmeBot')) {
         }
 
         /**
-         * Add settings action link to the plugins page.
+         * Add settings link to plugins page.
          */
         public function add_settings_link(array $links): array
         {
             $settings_link = sprintf(
                 '<a href="%s">%s</a>',
                 esc_url(admin_url('options-general.php?page=acme-bot-integration')),
-                esc_html__('Settings', 'acme-bot')
+                'Settings'
             );
             array_unshift($links, $settings_link);
             return $links;
         }
 
-
         /**
-         * Add the Acme Bot API host to the list of allowed redirect hosts.
+         * Add the Acme Bot API host to allowed redirect hosts.
          */
         public function add_acmebot_allowed_host(array $hosts): array
         {
@@ -673,32 +589,32 @@ if (!class_exists('AcmeBot')) {
         }
 
         /**
-         * Add options page under the Settings menu.
+         * Add options page.
          */
         public function add_plugin_page(): void
         {
             add_options_page(
-                __('Acme Bot Settings', 'acme-bot'),        // Page title
-                __('Acme Bot', 'acme-bot'),                 // Menu title
-                'manage_options',                            // Capability required
-                'acme-bot-integration',                    // Menu slug
-                [$this, 'render_admin_page']                // Function to display the page (renamed)
+                'Acme Bot Settings',
+                'Acme Bot',
+                'manage_options',
+                'acme-bot-integration',
+                [$this, 'render_admin_page']
             );
         }
 
         /**
-         * Render the admin settings page content by including the template file.
+         * Render the admin settings page.
          */
-        public function render_admin_page(): void // Renamed
+        public function render_admin_page(): void
         {
             $template_path = plugin_dir_path(__FILE__) . 'admin/admin-settings-page.php';
 
             if (file_exists($template_path)) {
                 include $template_path;
             } else {
-                echo '<div class="wrap"><h1>' . esc_html__('Acme Bot Settings', 'acme-bot') . '</h1>';
+                echo '<div class="wrap"><h1>' . 'Acme Bot Settings' . '</h1>';
                 echo '<div class="notice notice-error"><p>' . sprintf(
-                    esc_html__('Error: Settings page template not found at %s', 'acme-bot'),
+                    esc_html('Error: Settings page template not found at %s'),
                     '<code>' . esc_html($template_path) . '</code>'
                 ) . '</p></div>';
                 echo '</div>';
@@ -706,13 +622,19 @@ if (!class_exists('AcmeBot')) {
         }
 
         /**
-         * Display admin notices for settings errors, success messages, etc.
-         * Consolidated from display_settings_errors.
+         * Display admin notices.
          */
         public function display_admin_notices(): void
         {
+
+            $nonce_action = 'acmebot_admin_notices';
+
+            // Check if our nonce is set in the URL
+            $has_valid_nonce = isset($_GET['acmebot_nonce']) &&
+                wp_verify_nonce(sanitize_key($_GET['acmebot_nonce']), $nonce_action);
+
             // Check for errors stored in transient
-            if (isset($_GET['acmebot_error']) && $_GET['acmebot_error'] === '1') {
+            if (isset($_GET['acmebot_error']) && $_GET['acmebot_error'] === '1' && $has_valid_nonce) {
                 $errors = get_transient('acmebot_settings_errors');
                 if ($errors && is_array($errors)) {
                     foreach ($errors as $error) {
@@ -722,25 +644,12 @@ if (!class_exists('AcmeBot')) {
                 }
             }
 
-            // Check for success message from setup redirect
-            if (isset($_GET['acmebot_setup_success']) && $_GET['acmebot_setup_success'] === '1') {
-                echo '<div class="notice notice-success is-dismissible"><p>' .
-                    esc_html__('AcmeBot integration setup and verification successful!', 'acme-bot') .
-                    '</p></div>';
-            }
-
-            // Check for failure message from setup redirect
-            if (isset($_GET['acmebot_setup_fail']) && $_GET['acmebot_setup_fail'] === '1') {
-                echo '<div class="notice notice-warning is-dismissible"><p>' .
-                    esc_html__('AcmeBot integration setup failed or verification could not be completed. Please check the connection or try again.', 'acme-bot') .
-                    '</p></div>';
-            }
 
             // Check for message after activation redirect
-            if (isset($_GET['acmebot_just_activated']) && $_GET['acmebot_just_activated'] === '1') {
+            if (isset($_GET['acmebot_just_activated']) && $_GET['acmebot_just_activated'] === '1' && $has_valid_nonce) {
                 if (!get_option(self::SECRET_OPTION)) {
                     echo '<div class="notice notice-info is-dismissible"><p>' .
-                        esc_html__('Welcome to AcmeBot! Please click the "Connect to AcmeBot" button below to complete the setup.', 'acme-bot') .
+                        'Welcome to AcmeBot! Please click the "Connect to AcmeBot" button below to complete the setup.' .
                         '</p></div>';
                 }
             }
@@ -749,4 +658,4 @@ if (!class_exists('AcmeBot')) {
 
     // Instantiate the plugin class.
     new AcmeBot();
-} // End if (!class_exists('AcmeBot'))
+}

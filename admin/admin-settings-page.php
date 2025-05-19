@@ -20,15 +20,12 @@ $is_integration_completed = get_option(AcmeBot::IS_INTEGRATION_COMPLETED);
 $is_connected = !empty($acmebot_secret);
 $webhook_url = $is_connected ? rest_url('acmebot/v' . AcmeBot::REST_VERSION . '/webhook') : '';
 $documentation_url = 'https://acme.bot/blog/application-passwords';
-$logo_url = 'https://acme.bot/logo/logo-small-wide.svg';
 
 // Get any error messages that need to be displayed
 $error_messages = get_transient('acmebot_settings_errors');
-$success_message = isset($_GET['acmebot_setup_success']) && $_GET['acmebot_setup_success'] === '1';
+// $success_message = isset($_GET['acmebot_setup_success']) && $_GET['acmebot_setup_success'] === '1';
 ?>
 <div class="settings-wrap">
-    <!-- <h1 class="title"><?php echo esc_html(get_admin_page_title()); ?></h1> -->
-
     <?php
     // Display error messages if any
     if (!empty($error_messages) && is_array($error_messages)) : ?>
@@ -40,44 +37,37 @@ $success_message = isset($_GET['acmebot_setup_success']) && $_GET['acmebot_setup
     <?php
         // Clear the error messages after displaying them
         delete_transient('acmebot_settings_errors');
-    endif;
-
-    // Display success message if applicable
-    if ($success_message) : ?>
-        <div class="acmebot-notice success-notice is-dismissible">
-            <p><?php esc_html_e('Acme Bot integration setup was successful!', 'acme-bot'); ?></p>
-        </div>
-    <?php endif; ?>
+    endif; ?>
 
     <div class="content-box">
         <div class="card">
             <div class="card-body">
                 <?php if ($is_connected) : ?>
                     <div class="logo-box">
-                        <img src="<?php echo esc_url($logo_url); ?>" alt="Acme Bot" class="acmebot-logo-img" />
+                        <img src="<?php echo esc_url(AcmeBot::get_asset_url('images/logo-small-wide.svg')); ?>" alt="Acme Bot" class="acmebot-logo-img" loading="lazy" />
                     </div>
 
-                    <h2 class="card-title"><?php esc_html_e('Automate content marketing with ACME BOT', 'acme-bot'); ?></h2>
+                    <h2 class="card-title">Automate content marketing with ACME BOT</h2>
                     <?php if ($is_integration_completed) : ?>
-                        <p><?php esc_html_e('Acme Bot is successfully connected to this site.', 'acme-bot'); ?></p>
+                        <p>Acme Bot is successfully connected to this site.</p>
                     <?php endif; ?>
 
                     <?php if (!$is_integration_completed) : ?>
-                        <p><?php esc_html_e('Acme Bot connection is incomplete! Please try to reconnect.', 'acme-bot'); ?></p>
+                        <p>Acme Bot connection is incomplete! Please try to reconnect.</p>
                     <?php endif; ?>
 
                     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="acmebot-connect-form">
                         <input type="hidden" name="action" value="acmebot_handle_form">
                         <?php wp_nonce_field('acmebot_settings_action', 'acmebot_settings_nonce'); ?>
                         <div class="items-center">
-                            <?php submit_button(__('Reconnect to Acme Bot', 'acme-bot'), 'primary large', 'submit', true); ?>
+                            <?php submit_button('Reconnect to Acme Bot', 'primary large', 'submit', true); ?>
                         </div>
                     </form>
-                    <p class="text-muted"><?php esc_html_e('If you need to refresh or update your connection, click "Reconnect".', 'acme-bot'); ?></p>
+                    <p class="text-muted">If you need to refresh or update your connection, click "Reconnect".</p>
 
                 <?php else : ?>
                     <div class="logo-box">
-                        <img src="<?php echo esc_url($logo_url); ?>" alt="Acme Bot" class="acmebot-logo-img" />
+                        <img src="<?php echo esc_url(AcmeBot::get_asset_url('images/logo-small-wide.svg')); ?>" alt="Acme Bot" class="acmebot-logo-img" loading="lazy" />
                     </div>
 
                     <h2 class="card-title"><?php esc_html_e('Automate content marketing with ACME BOT', 'acme-bot'); ?></h2>
@@ -86,7 +76,7 @@ $success_message = isset($_GET['acmebot_setup_success']) && $_GET['acmebot_setup
                         <input type="hidden" name="action" value="acmebot_handle_form">
                         <?php wp_nonce_field('acmebot_settings_action', 'acmebot_settings_nonce'); ?>
                         <div class="items-center">
-                            <?php submit_button(__('Connect to Acme Bot', 'acme-bot'), 'primary large', 'submit', true); ?>
+                            <?php submit_button('Connect to Acme Bot', 'primary large', 'submit', true); ?>
                         </div>
                     </form>
                 <?php endif; ?>
@@ -99,7 +89,7 @@ $success_message = isset($_GET['acmebot_setup_success']) && $_GET['acmebot_setup
                     <?php
                     printf(
                         wp_kses(
-                            __('Alternatively, <a href="%s" target="_blank" rel="noopener noreferrer">learn about Application Passwords</a>.', 'acme-bot'),
+                            'Alternatively, <a href="%s" target="_blank" rel="noopener noreferrer">learn about Application Passwords</a>.',
                             ['a' => ['href' => [], 'target' => [], 'rel' => []]]
                         ),
                         esc_url($documentation_url)
@@ -107,7 +97,7 @@ $success_message = isset($_GET['acmebot_setup_success']) && $_GET['acmebot_setup
                     ?>
                 </p>
                 <p>
-                    <small><?php esc_html_e('Application Passwords might be required for alternative authentication methods. The primary connection method above is recommended.', 'acme-bot'); ?></small>
+                    <small>Application Passwords might be required for alternative authentication methods. The primary connection method above is recommended.</small>
                 </p>
             </div>
         <?php endif; ?>
