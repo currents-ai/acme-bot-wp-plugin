@@ -70,8 +70,8 @@ $error_messages = get_transient('acmebot_settings_errors');
                         <img src="<?php echo esc_url(AcmeBot::get_asset_url('images/logo-small-wide.svg')); ?>" alt="Acme Bot" class="acmebot-logo-img" loading="lazy" />
                     </div>
 
-                    <h2 class="card-title"><?php esc_html_e('Automate content marketing with ACME BOT', 'acme-bot'); ?></h2>
-                    <p><?php esc_html_e('Set up your Acme Bot account to enable AI features on this site.', 'acme-bot'); ?></p>
+                    <h2 class="card-title"><?php esc_html('Automate content marketing with ACME BOT'); ?></h2>
+                    <p><?php esc_html('Set up your Acme Bot account to enable AI features on this site.'); ?></p>
                     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="acmebot-connect-form">
                         <input type="hidden" name="action" value="acmebot_handle_form">
                         <?php wp_nonce_field('acmebot_settings_action', 'acmebot_settings_nonce'); ?>

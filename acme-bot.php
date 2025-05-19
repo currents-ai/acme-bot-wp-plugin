@@ -50,7 +50,7 @@ if (!class_exists('AcmeBot')) {
         const DEFAULT_AUTHOR_ID = 1;
 
         /** Base URL for API endpoints */
-        const BASE_URL = 'http://localhost:8001'; // 'https://acme.bot';
+        const BASE_URL = 'https://acme.bot';
 
         /** API authorization URL */
         const ACMEBOT_API_AUTHORIZE_URL = self::BASE_URL . '/d/{cust_id}/connectors/create';

@@ -8,7 +8,7 @@ Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Run your WordPress blog on auto-pilot with ACME.BOT - the fully automated AI SEO writer that creates deep-researched, publish-ready content with AI diagrams.
+Run your WordPress blog on auto-pilot with ACME.BOT - automated AI SEO writer that creates deep-researched, publish-ready content with AI diagrams.
 
 == Description ==
 ACME.BOT is a fully automated AI SEO writer for businesses that integrates seamlessly with WordPress to enable running your blog on auto-pilot. Unlike generic AI-generated content that risks diluting your credibility, ACME.BOT focuses on writing useful high-quality blogs that your audience will find valuable, while simultaneously helping your SEO and Answer Engine ranking.
@@ -45,11 +45,8 @@ Absolutely. ACME.BOT includes built-in AI keyword planning and competitor gap an
 
 == Screenshots ==
 
-ACME.BOT dashboard showing content calendar and performance metrics
-AI-generated blog post with custom diagram illustration
-Content strategy planner with keyword suggestions
-Auto-publishing configuration panel
-Sample of a deep-researched article created by ACME.BOT
+1. AI-generated blog post with custom diagram illustration
+2. Auto-publishing configuration panel
 
 == Changelog ==
 = 1.0.0 =
@@ -69,3 +66,5 @@ First public release of ACME.BOT for WordPress - transform your content marketin
 In today's content-saturated digital landscape, standing out requires more than just quantity. ACME.BOT ensures your WordPress blog features high-quality, deep-researched content that actually helps your audience while improving your search rankings.
 The best way to rank while retaining an audience is to write articles that are genuinely helpful - that's why ACME.BOT focuses on creating valuable content, not AI-generated fluff. With features like the advanced AI diagram generator and strategic content planning, ACME.BOT ensures consistent branding, higher conversion rates, and stress-free reliability for your WordPress site.
 Experience the difference of a fully automated AI SEO writer that understands both search algorithms and human readers.
+
+The plugin creates a REST endpoint that’s used by ACME.BOT to publish articles on your WordPress website.
