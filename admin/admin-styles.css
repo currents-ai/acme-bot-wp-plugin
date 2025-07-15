@@ -1,0 +1,258 @@
+/* Main Settings Container */
+.acmebot-settings-wrap {
+    font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+    min-height: calc(100vh - 10rem);
+    padding: 40px 20px 60px;
+    margin-top: 20px;
+}
+
+/* Page Title */
+.acmebot-title {
+    text-align: center;
+    font-size: 2.4em;
+    font-weight: 700;
+    margin: 20px 0 40px 0;
+    letter-spacing: -1px;
+    color: #1a2238;
+    text-shadow: 0px 1px 2px rgba(255, 255, 255, 0.8);
+    position: relative;
+}
+
+.acmebot-title:after {
+    content: "";
+    display: block;
+    width: 80px;
+    height: 4px;
+    background: linear-gradient(90deg, #2563eb 0%, #22d3ee 100%);
+    margin: 15px auto 0;
+    border-radius: 2px;
+}
+
+/* Content Container */
+.acmebot-content-box {
+    max-width: 520px;
+    margin: 0 auto;
+}
+
+/* Card Design */
+.acmebot-card {
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 8px 30px rgba(30, 34, 90, 0.09), 0 2px 8px rgba(30, 34, 90, 0.05);
+    padding: 0 0 40px 0;
+    margin-bottom: 40px;
+    border: none;
+    transition: all 0.3s ease;
+    overflow: hidden;
+    position: relative;
+}
+
+.acmebot-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 40px rgba(30, 34, 90, 0.12), 0 4px 12px rgba(30, 34, 90, 0.08);
+}
+
+.acmebot-card:before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 6px;
+    background: linear-gradient(90deg, #2563eb 0%, #22d3ee 100%);
+}
+
+.acmebot-card-body {
+    padding: 45px 40px 0 40px;
+    text-align: center;
+}
+
+/* Logo Styling */
+.acmebot-logo-box {
+    margin: 1.5rem auto 2.5rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: transform 0.3s ease;
+}
+
+.acmebot-logo-box:hover {
+    transform: scale(1.05);
+}
+
+.acmebot-logo-img {
+    width: fit-content;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+    filter: drop-shadow(0 4px 6px rgba(30, 34, 90, 0.15));
+}
+
+/* Card Title */
+.acmebot-card-title {
+    font-size: 1.6em;
+    font-weight: 700;
+    margin: 0 0 22px 0;
+    color: #1a2238;
+    letter-spacing: -0.5px;
+}
+
+/* Form */
+.acmebot-items-center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Connect Button */
+.button-primary.button-large {
+    background: linear-gradient(90deg, #2563eb 0%, #22d3ee 100%);
+    border: none;
+    color: #fff;
+    font-size: 1.15em;
+    font-weight: 600;
+    padding: 15px 36px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    transition: all 0.3s ease;
+    cursor: pointer;
+    margin: 0 auto;
+    display: block;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.button-primary.button-large:hover,
+.button-primary.button-large:focus {
+    background: linear-gradient(90deg, #1e40af 0%, #06b6d4 100%);
+    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.35);
+    transform: translateY(-2px);
+}
+
+.button-primary.button-large:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+}
+
+/* Secondary Link */
+.acmebot-secondary-link {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 3px 12px rgba(30, 34, 90, 0.06);
+    padding: 22px 28px;
+    text-align: center;
+    font-size: 15px;
+    color: #334155;
+    border: 1px solid rgba(37, 99, 235, 0.06);
+    transition: all 0.3s ease;
+}
+
+.acmebot-secondary-link:hover {
+    box-shadow: 0 5px 15px rgba(30, 34, 90, 0.09);
+    transform: translateY(-3px);
+}
+
+.acmebot-secondary-link a {
+    color: #2563eb;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    border-bottom: 1px solid transparent;
+    padding-bottom: 2px;
+}
+
+.acmebot-secondary-link a:hover {
+    color: #0ea5e9;
+    border-bottom: 1px solid #0ea5e9;
+}
+
+.acmebot-secondary-link small {
+    color: #64748b;
+    display: block;
+    margin-top: 12px;
+    font-style: italic;
+}
+
+.acmebot-notice {
+    max-width: 520px;
+    margin: 0 auto 30px;
+    padding: 15px 20px;
+    border-radius: 12px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.07);
+    border-left: 4px solid;
+    animation: fadeIn 0.4s ease-out forwards;
+}
+
+.acmebot-notice p {
+    margin: 8px 0;
+    font-size: 14px;
+}
+
+.acmebot-notice.error-notice {
+    background-color: #fff5f5;
+    border-left-color: #e53e3e;
+    color: #c53030;
+}
+
+.acmebot-notice.success-notice {
+    background-color: #f0fff4;
+    border-left-color: #38a169;
+    color: #2f855a;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .acmebot-title {
+        font-size: 2em;
+    }
+
+    .acmebot-content-box {
+        max-width: 100%;
+    }
+
+    .acmebot-card-body {
+        padding: 30px 20px 0 20px;
+    }
+
+    .acmebot-btn.acmebot-button-primary.acmebot-large {
+        padding: 12px 24px;
+        font-size: 1em;
+        width: 100%;
+    }
+
+    .acmebot-secondary-link {
+        padding: 18px 20px;
+    }
+
+    .acmebot-notice {
+        max-width: 100%;
+        margin-bottom: 20px;
+    }
+}
+
+/* Animation Effects */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.acmebot-settings-wrap {
+    animation: fadeIn 0.5s ease-out forwards;
+}
+
+.acmebot-card {
+    animation: fadeIn 0.6s ease-out forwards;
+    animation-delay: 0.1s;
+}
+
+.acmebot-secondary-link {
+    animation: fadeIn 0.7s ease-out forwards;
+    animation-delay: 0.2s;
+}

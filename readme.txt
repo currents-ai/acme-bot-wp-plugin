@@ -3,7 +3,7 @@ Contributors: acmebot
 Tags: ai seo writer, ai diagram generator, content automation, blog autopilot, content marketing
 Requires at least: 5.0
 Tested up to: 6.8
-Stable tag: 1.0.0
+Stable tag: 1.0.2
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -49,7 +49,18 @@ Absolutely. ACME.BOT includes built-in AI keyword planning and competitor gap an
 2. Auto-publishing configuration panel
 
 == Changelog ==
-= 1.0.0 =
+
+= 1.0.2 =
+* NEW: SEO meta data support - title, description, keywords, canonical URL
+* NEW: Open Graph and Twitter Card meta tag support
+* NEW: Automatic integration with popular SEO plugins (Yoast, RankMath, AIOSEO)
+* NEW: Built-in SEO functionality when no SEO plugin is installed
+
+= 1.0.1 =
+* Fixed issue mentioned in review.
+* Initial submission fixes.
+
+
 
 Initial release of ACME.BOT WordPress plugin
 Integration with WordPress publishing system

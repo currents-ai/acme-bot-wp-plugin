@@ -8,7 +8,7 @@
  * @wordpress-plugin
  * Plugin Name:     ACME.BOT - AI SEO Writer & Content Generator
  * Description:     Run your WordPress blog on auto-pilot with ACME.BOT - the fully automated AI SEO writer that creates deep-researched, publish-ready content with AI diagrams.
- * Version:         1.0.0 
+ * Version:         1.0.2
  * Author:          ACME.BOT
  * Author URI:      https://acme.bot/
  * License:         GPL-2.0 or later
@@ -65,6 +65,8 @@ if (!class_exists('AcmeBot')) {
         {
             // Register REST API endpoints
             add_action('rest_api_init', [$this, 'register_rest_routes']);
+            // Initialize SEO hooks
+            add_action('init', [$this, 'init_seo_hooks']);
 
             // Admin specific hooks
             if (is_admin()) {
@@ -74,6 +76,7 @@ if (!class_exists('AcmeBot')) {
                 add_action('admin_post_acmebot_handle_form', [$this, 'handle_form_submission']);
                 add_action('admin_notices', [$this, 'display_admin_notices']);
                 add_action('admin_init', [$this, 'handle_activation_redirect']);
+                add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_styles']);
 
                 // Cors preflight
                 add_filter('rest_pre_serve_request', function ($served, $result) {
@@ -86,6 +89,25 @@ if (!class_exists('AcmeBot')) {
                 register_activation_hook(__FILE__, ['AcmeBot', 'activate']);
                 register_deactivation_hook(__FILE__, ['AcmeBot', 'deactivate']);
             }
+        }
+
+        /**
+         * Enqueue admin styles
+         */
+        public function enqueue_admin_styles($hook_suffix): void
+
+        {
+
+            if (esc_html($hook_suffix) !== 'settings_page_acme-bot-integration') {
+                return;
+            }
+
+            wp_enqueue_style(
+                'acmebot-admin-styles',
+                plugin_dir_url(__FILE__) . 'admin/admin-styles.css',
+                [],
+                '1.0.0'
+            );
         }
 
         /**
@@ -120,25 +142,21 @@ if (!class_exists('AcmeBot')) {
             if (get_transient('acmebot_activation_redirect')) {
                 delete_transient('acmebot_activation_redirect');
 
-                $activate_multi = sanitize_key(filter_input(INPUT_GET, 'activate-multi', FILTER_SANITIZE_FULL_SPECIAL_CHARS));
-
-                if (empty($activate_multi)) {
-                    wp_safe_redirect(add_query_arg(
-                        [
-                            'page' => 'acme-bot-integration',
-                            'acmebot_just_activated' => '1',
-                            'acmebot_nonce' => wp_create_nonce('acmebot_admin_notices')
-                        ],
-                        admin_url('options-general.php')
-                    ));
-                    exit;
-                }
+                wp_safe_redirect(add_query_arg(
+                    [
+                        'page' => 'acme-bot-integration',
+                        'acmebot_just_activated' => '1',
+                        'acmebot_nonce' => wp_create_nonce('acmebot_admin_notices')
+                    ],
+                    admin_url('options-general.php')
+                ));
+                exit;
             }
         }
 
         public static function get_asset_url($relative_path)
         {
-            return plugins_url('assets/' . $relative_path, __FILE__);
+            return plugin_dir_url(__FILE__) . 'assets/' . $relative_path;
         }
 
         /**
@@ -463,6 +481,10 @@ if (!class_exists('AcmeBot')) {
                     );
                 }
 
+                // Handle SEO Meta Data
+                $this->handle_seo_meta($result_post_id, $payload);
+
+
                 // Success
                 $post_url = get_permalink($result_post_id);
                 $action = $is_update ? 'updated' : 'created';
@@ -482,6 +504,375 @@ if (!class_exists('AcmeBot')) {
                     'message' => sprintf('Error handling post creation/update: %s', $e->getMessage()),
                 ], 500);
             }
+        }
+
+
+        /**
+         * Handle SEO meta data for the post.
+         * 
+         * @param int $post_id The post ID.
+         * @param array|object $payload The payload containing SEO data.
+         */
+        private function handle_seo_meta($post_id, $payload)
+        {
+            // Validate inputs
+            if (!is_numeric($post_id) || $post_id <= 0) {
+                return;
+            }
+
+            // Check if SEO data exists in payload
+            if (!isset($payload['meta']) || !is_array($payload['meta'])) {
+                return;
+            }
+
+            $seo_data = $payload['meta'];
+
+            // Define allowed SEO fields with their validation
+            $allowed_fields = [
+                'title' => 'sanitize_text_field',
+                'description' => 'sanitize_textarea_field',
+                'keywords' => 'sanitize_text_field',
+                'canonical' => 'esc_url_raw',
+                'robots' => 'sanitize_text_field',
+                'og_title' => 'sanitize_text_field',
+                'og_description' => 'sanitize_textarea_field',
+                'og_image' => 'esc_url_raw',
+                'twitter_title' => 'sanitize_text_field',
+                'twitter_description' => 'sanitize_textarea_field',
+                'twitter_image' => 'esc_url_raw',
+            ];
+
+            // Process and validate each field
+            $validated_seo_data = [];
+            foreach ($allowed_fields as $field => $sanitize_callback) {
+                if (isset($seo_data[$field]) && is_string($seo_data[$field])) {
+                    $validated_value = call_user_func($sanitize_callback, $seo_data[$field]);
+                    if (!empty($validated_value)) {
+                        $validated_seo_data[$field] = $validated_value;
+                    }
+                }
+            }
+
+            // Only proceed if we have valid SEO data
+            if (empty($validated_seo_data)) {
+                return;
+            }
+
+            // Track which plugins handled the data
+            $handled_by_plugin = false;
+
+            // Handle Yoast SEO if available
+            if (defined('WPSEO_VERSION') || class_exists('WPSEO_Options')) {
+                $this->handle_yoast_seo($post_id, $validated_seo_data);
+                $handled_by_plugin = true;
+            }
+
+            // Handle RankMath SEO if available
+            if (defined('RANK_MATH_VERSION') || class_exists('RankMath')) {
+                $this->handle_rankmath_seo($post_id, $validated_seo_data);
+                $handled_by_plugin = true;
+            }
+
+            // Handle All in One SEO if available
+            if (defined('AIOSEO_VERSION') || class_exists('AIOSEO\\Plugin\\AIOSEO')) {
+                $this->handle_aioseo_seo($post_id, $validated_seo_data);
+                $handled_by_plugin = true;
+            }
+
+            // Always store in our own format for fallback and consistency
+            $this->handle_acme_bot_seo($post_id, $validated_seo_data);
+        }
+
+        /**
+         * Handle Yoast SEO meta fields.
+         * 
+         * @param int $post_id Post ID.
+         * @param array $seo_data Validated SEO data.
+         */
+        private function handle_yoast_seo($post_id, $seo_data)
+        {
+            $yoast_fields = [
+                'title' => '_yoast_wpseo_title',
+                'description' => '_yoast_wpseo_metadesc',
+                'keywords' => '_yoast_wpseo_focuskw',
+                'canonical' => '_yoast_wpseo_canonical',
+                'robots' => '_yoast_wpseo_meta-robots-noindex',
+                'og_title' => '_yoast_wpseo_opengraph-title',
+                'og_description' => '_yoast_wpseo_opengraph-description',
+                'og_image' => '_yoast_wpseo_opengraph-image',
+                'twitter_title' => '_yoast_wpseo_twitter-title',
+                'twitter_description' => '_yoast_wpseo_twitter-description',
+                'twitter_image' => '_yoast_wpseo_twitter-image',
+            ];
+
+            foreach ($yoast_fields as $key => $meta_key) {
+                if (isset($seo_data[$key])) {
+                    update_post_meta($post_id, $meta_key, $seo_data[$key]);
+                }
+            }
+        }
+
+        /**
+         * Handle RankMath SEO meta fields.
+         * 
+         * @param int $post_id Post ID.
+         * @param array $seo_data Validated SEO data.
+         */
+        private function handle_rankmath_seo($post_id, $seo_data)
+        {
+            $rankmath_fields = [
+                'title' => 'rank_math_title',
+                'description' => 'rank_math_description',
+                'keywords' => 'rank_math_focus_keyword',
+                'canonical' => 'rank_math_canonical_url',
+                'robots' => 'rank_math_robots',
+                'og_title' => 'rank_math_facebook_title',
+                'og_description' => 'rank_math_facebook_description',
+                'og_image' => 'rank_math_facebook_image',
+                'twitter_title' => 'rank_math_twitter_title',
+                'twitter_description' => 'rank_math_twitter_description',
+                'twitter_image' => 'rank_math_twitter_image',
+            ];
+
+            foreach ($rankmath_fields as $key => $meta_key) {
+                if (isset($seo_data[$key])) {
+                    update_post_meta($post_id, $meta_key, $seo_data[$key]);
+                }
+            }
+        }
+
+        /**
+         * Handle All in One SEO meta fields.
+         * 
+         * @param int $post_id Post ID.
+         * @param array $seo_data Validated SEO data.
+         */
+        private function handle_aioseo_seo($post_id, $seo_data)
+        {
+            $aioseo_fields = [
+                'title' => '_aioseo_title',
+                'description' => '_aioseo_description',
+                'keywords' => '_aioseo_keywords',
+                'canonical' => '_aioseo_canonical_url',
+                'robots' => '_aioseo_robots_default',
+                'og_title' => '_aioseo_og_title',
+                'og_description' => '_aioseo_og_description',
+                'og_image' => '_aioseo_og_image',
+                'twitter_title' => '_aioseo_twitter_title',
+                'twitter_description' => '_aioseo_twitter_description',
+                'twitter_image' => '_aioseo_twitter_image',
+            ];
+
+            foreach ($aioseo_fields as $key => $meta_key) {
+                if (isset($seo_data[$key])) {
+                    update_post_meta($post_id, $meta_key, $seo_data[$key]);
+                }
+            }
+        }
+
+        /**
+         * Handle Acme Bot AI SEO meta fields (our plugin's format).
+         * 
+         * @param int $post_id Post ID.
+         * @param array $seo_data Validated SEO data.
+         */
+        private function handle_acme_bot_seo($post_id, $seo_data)
+        {
+            $acme_fields = [
+                'title' => '_acme_bot_ai_seo_title',
+                'description' => '_acme_bot_ai_seo_description',
+                'keywords' => '_acme_bot_ai_seo_keywords',
+                'canonical' => '_acme_bot_ai_seo_canonical',
+                'robots' => '_acme_bot_ai_seo_robots',
+                'og_title' => '_acme_bot_ai_seo_og_title',
+                'og_description' => '_acme_bot_ai_seo_og_description',
+                'og_image' => '_acme_bot_ai_seo_og_image',
+                'twitter_title' => '_acme_bot_ai_seo_twitter_title',
+                'twitter_description' => '_acme_bot_ai_seo_twitter_description',
+                'twitter_image' => '_acme_bot_ai_seo_twitter_image',
+            ];
+
+            foreach ($acme_fields as $key => $meta_key) {
+                if (isset($seo_data[$key])) {
+                    update_post_meta($post_id, $meta_key, $seo_data[$key]);
+                }
+            }
+        }
+
+        /**
+         * Get SEO meta data for a post.
+         * This method retrieves SEO data regardless of which plugin stored it.
+         * 
+         * @param int $post_id Post ID.
+         * @return array SEO data array.
+         */
+        public function get_post_seo_data($post_id)
+        {
+            if (!is_numeric($post_id) || $post_id <= 0) {
+                return [];
+            }
+
+            $seo_data = [];
+
+            // Try to get from our plugin first
+            $acme_fields = [
+                'title' => '_acme_bot_ai_seo_title',
+                'description' => '_acme_bot_ai_seo_description',
+                'keywords' => '_acme_bot_ai_seo_keywords',
+                'canonical' => '_acme_bot_ai_seo_canonical',
+                'robots' => '_acme_bot_ai_seo_robots',
+                'og_title' => '_acme_bot_ai_seo_og_title',
+                'og_description' => '_acme_bot_ai_seo_og_description',
+                'og_image' => '_acme_bot_ai_seo_og_image',
+                'twitter_title' => '_acme_bot_ai_seo_twitter_title',
+                'twitter_description' => '_acme_bot_ai_seo_twitter_description',
+                'twitter_image' => '_acme_bot_ai_seo_twitter_image',
+            ];
+
+            foreach ($acme_fields as $key => $meta_key) {
+                $value = get_post_meta($post_id, $meta_key, true);
+                if (!empty($value)) {
+                    $seo_data[$key] = $value;
+                }
+            }
+
+            return $seo_data;
+        }
+
+        /**
+         * Initialize SEO hooks for frontend display when no SEO plugin is available.
+         * Call this method during plugin initialization.
+         */
+        public function init_seo_hooks()
+        {
+            // Only add hooks if no major SEO plugin is active
+            if (!$this->has_seo_plugin()) {
+                add_action('wp_head', [$this, 'output_seo_meta_tags'], 1);
+                add_filter('document_title_parts', [$this, 'filter_document_title'], 10, 1);
+                add_filter('wp_title', [$this, 'filter_wp_title'], 10, 2);
+            }
+        }
+
+        /**
+         * Check if any major SEO plugin is active.
+         * 
+         * @return bool True if SEO plugin is active.
+         */
+        private function has_seo_plugin()
+        {
+            return (
+                defined('WPSEO_VERSION') ||
+                class_exists('WPSEO_Options') ||
+                defined('RANK_MATH_VERSION') ||
+                class_exists('RankMath') ||
+                defined('AIOSEO_VERSION') ||
+                class_exists('AIOSEO\\Plugin\\AIOSEO')
+            );
+        }
+
+        /**
+         * Output SEO meta tags in the head when no SEO plugin is available.
+         */
+        public function output_seo_meta_tags()
+        {
+            if (!is_singular()) {
+                return;
+            }
+
+            global $post;
+            $seo_data = $this->get_post_seo_data($post->ID);
+
+            if (empty($seo_data)) {
+                return;
+            }
+
+            // Meta description
+            if (!empty($seo_data['description'])) {
+                echo '<meta name="description" content="' . esc_attr($seo_data['description']) . '">' . "\n";
+            }
+
+            // Meta keywords
+            if (!empty($seo_data['keywords'])) {
+                echo '<meta name="keywords" content="' . esc_attr($seo_data['keywords']) . '">' . "\n";
+            }
+
+            // Canonical URL
+            if (!empty($seo_data['canonical'])) {
+                echo '<link rel="canonical" href="' . esc_url($seo_data['canonical']) . '">' . "\n";
+            }
+
+            // Robots meta
+            if (!empty($seo_data['robots'])) {
+                echo '<meta name="robots" content="' . esc_attr($seo_data['robots']) . '">' . "\n";
+            }
+
+            // Open Graph tags
+            if (!empty($seo_data['og_title'])) {
+                echo '<meta property="og:title" content="' . esc_attr($seo_data['og_title']) . '">' . "\n";
+            }
+            if (!empty($seo_data['og_description'])) {
+                echo '<meta property="og:description" content="' . esc_attr($seo_data['og_description']) . '">' . "\n";
+            }
+            if (!empty($seo_data['og_image'])) {
+                echo '<meta property="og:image" content="' . esc_url($seo_data['og_image']) . '">' . "\n";
+            }
+
+            // Twitter Card tags
+            if (!empty($seo_data['twitter_title'])) {
+                echo '<meta name="twitter:title" content="' . esc_attr($seo_data['twitter_title']) . '">' . "\n";
+            }
+            if (!empty($seo_data['twitter_description'])) {
+                echo '<meta name="twitter:description" content="' . esc_attr($seo_data['twitter_description']) . '">' . "\n";
+            }
+            if (!empty($seo_data['twitter_image'])) {
+                echo '<meta name="twitter:image" content="' . esc_url($seo_data['twitter_image']) . '">' . "\n";
+                echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
+            }
+        }
+
+        /**
+         * Filter the document title when no SEO plugin is available.
+         * 
+         * @param array $title The document title parts.
+         * @return array Modified title parts.
+         */
+        public function filter_document_title($title)
+        {
+            if (!is_singular()) {
+                return $title;
+            }
+
+            global $post;
+            $seo_data = $this->get_post_seo_data($post->ID);
+
+            if (!empty($seo_data['title'])) {
+                $title['title'] = $seo_data['title'];
+            }
+
+            return $title;
+        }
+
+        /**
+         * Filter wp_title when no SEO plugin is available (fallback for older themes).
+         * 
+         * @param string $title The page title.
+         * @param string $sep The title separator.
+         * @return string Modified title.
+         */
+        public function filter_wp_title($title, $sep)
+        {
+            if (!is_singular()) {
+                return $title;
+            }
+
+            global $post;
+            $seo_data = $this->get_post_seo_data($post->ID);
+
+            if (!empty($seo_data['title'])) {
+                return $seo_data['title'] . ' ' . $sep . ' ' . get_bloginfo('name');
+            }
+
+            return $title;
         }
 
         /**
