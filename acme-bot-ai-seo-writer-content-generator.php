@@ -208,35 +208,40 @@ if (!class_exists('AcmeBot')) {
          */
         private static function create_logs_table()
         {
-            try {
-                global $wpdb;
-                $table_name      = $wpdb->prefix . self::LOG_TABLE;
-                $charset_collate = $wpdb->get_charset_collate();
+            global $wpdb;
+            $table_name      = $wpdb->prefix . self::LOG_TABLE;
+            $charset_collate = $wpdb->get_charset_collate();
+            $db_version      = '1.0.0'; // Increment this if you change the table schema.
+            $option_name     = 'acmebot_logs_db_version';
 
+            $table_exists = $wpdb->get_var("SHOW TABLES LIKE '{$table_name}'") === $table_name;
+            // Check current version.
+            $installed_version = get_option($option_name);
+
+            if (($installed_version !== $db_version) || !$table_exists) {
                 $sql = "CREATE TABLE {$table_name} (
-                    id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-                    timestamp datetime DEFAULT CURRENT_TIMESTAMP,
-                    level varchar(20) NOT NULL DEFAULT 'info',
-                    endpoint varchar(255) NOT NULL,
-                    method varchar(10) NOT NULL,
-                    request_data longtext DEFAULT NULL,
-                    response_data longtext DEFAULT NULL,
-                    response_code int(3) UNSIGNED DEFAULT NULL,
-                    execution_time float DEFAULT NULL,
-                    error_message text DEFAULT NULL,
-                    post_id bigint(20) UNSIGNED DEFAULT NULL,
-                    PRIMARY KEY (id),
-                    KEY level (level),
-                    KEY endpoint (endpoint),
-                    KEY response_code (response_code),
-                    KEY post_id (post_id)
-                ) {$charset_collate};";
+                id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+                timestamp datetime DEFAULT CURRENT_TIMESTAMP,
+                level varchar(20) NOT NULL DEFAULT 'info',
+                endpoint varchar(255) NOT NULL,
+                method varchar(10) NOT NULL,
+                request_data longtext DEFAULT NULL,
+                response_data longtext DEFAULT NULL,
+                response_code int(3) UNSIGNED DEFAULT NULL,
+                execution_time float DEFAULT NULL,
+                error_message text DEFAULT NULL,
+                post_id bigint(20) UNSIGNED DEFAULT NULL,
+                PRIMARY KEY (id),
+                KEY level (level),
+                KEY endpoint (endpoint),
+                KEY response_code (response_code),
+                KEY post_id (post_id)
+            ) {$charset_collate};";
 
                 require_once ABSPATH . 'wp-admin/includes/upgrade.php';
                 dbDelta($sql);
-            } catch (Exception $e) {
-                // error_log('AcmeBot: Failed to create logs table: ' . $e->getMessage());
 
+                update_option($option_name, $db_version);
             }
         }
 
