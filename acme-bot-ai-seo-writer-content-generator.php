@@ -8,7 +8,7 @@
  * @wordpress-plugin
  * Plugin Name:     ACME.BOT - AI SEO Writer & Content Generator
  * Description:     Run your WordPress blog on auto-pilot with ACME.BOT - the fully automated AI SEO writer that creates deep-researched, publish-ready content with AI diagrams.
- * Version:         1.0.2
+ * Version:         1.0.4
  * Author:          ACME.BOT
  * Author URI:      https://acme.bot/
  * License:         GPL-2.0 or later
@@ -25,7 +25,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants.
-define('ACMEBOT_VERSION', '1.0.3');
+define('ACMEBOT_VERSION', '1.0.4');
 define('ACMEBOT_PLUGIN_FILE', __FILE__);
 define('ACMEBOT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('ACMEBOT_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -214,7 +214,7 @@ if (!class_exists('AcmeBot')) {
             $db_version      = '1.0.0'; // Increment this if you change the table schema.
             $option_name     = 'acmebot_logs_db_version';
 
-            $table_exists = $wpdb->get_var("SHOW TABLES LIKE '{$table_name}'") === $table_name;
+            $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $wpdb->esc_like($table_name))) === $table_name; //phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
             // Check current version.
             $installed_version = get_option($option_name);
 
